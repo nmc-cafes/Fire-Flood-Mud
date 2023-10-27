@@ -10,18 +10,23 @@ library(here)
 library(tidyverse)
 library(terra)
 library(tidyterra)
+library(spatstat)
 
 EPSG <- 5070
 all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
 
 ## Process fire perimeters 
-ca_fires <- c("DIXIE","CALDOR","KNP COMPLEX")
+# ca_fires <- c("DIXIE","CALDOR","KNP COMPLEX")
+wa_fires <- c("MUCKAMUCK","CEDAR CREEK")
 mtbs <- vect(here("mtbs_perimeter_data","mtbs_perims_DD.shp"))
 mtbs$Ig_Date <- as.Date(mtbs$Ig_Date)
 recent_fires <- mtbs[mtbs$Ig_Date > as.Date("2020-01-01")]
-cali_fires <- recent_fires[startsWith(recent_fires$Event_ID,"CA")]
-for(fire in ca_fires){
-  focal_fire <- cali_fires[cali_fires$Incid_Name==fire]
+# cali_fires <- recent_fires[startsWith(recent_fires$Event_ID,"CA")]
+wash_fires <- recent_fires[startsWith(recent_fires$Event_ID,"WA")]
+# for(fire in ca_fires){
+for(fire in wa_fires){
+  # focal_fire <- cali_fires[cali_fires$Incid_Name==fire]
+  focal_fire <- wash_fires[wash_fires$Incid_Name==fire]
   if(nrow(focal_fire)==1){
     focal_fire <- project(focal_fire, paste0("EPSG:",EPSG))
     plot(focal_fire)
@@ -42,8 +47,10 @@ clip_to_fire <- function(x, perimeter, EPSG){
 }
 
 ## Process DEMs
-ca_fires <- c("Dixie","Caldor","KNP")
-for(fire in ca_fires){
+# ca_fires <- c("Dixie","Caldor","KNP")
+wa_fires <- c("Muckamuck","CedarCreek")
+# for(fire in ca_fires){
+for(fire in wa_fires){
   print(fire)
   perimeter <- vect(here(fire,paste0(fire,"_perimeter.shp")))
   file_list <- list.files(here(fire,"DEM"))
@@ -61,6 +68,43 @@ for(fire in ca_fires){
   plot(merged_clip)
   print("   -writing")
   writeRaster(merged_clip, here(fire,paste0(fire,"_DEM.tif")), overwrite = T)
+}
+
+## Functions
+progress_bar <- function(iter,max_iter){
+  if(iter == 1){
+    cat("|----------|")
+  }
+  if(iter==max_iter/10){
+    cat("\n|=---------|")
+  }
+  if(iter==(max_iter/10)*2){
+    cat("\n|==--------|")
+  }
+  if(iter==(max_iter/10)*3){
+    cat("\n|===-------|")
+  }
+  if(iter==(max_iter/10)*4){
+    cat("\n|====------|")
+  }
+  if(iter==(max_iter/10)*5){
+    cat("\n|=====-----|")
+  }
+  if(iter==(max_iter/10)*6){
+    cat("\n|======----|")
+  }
+  if(iter==(max_iter/10)*7){
+    cat("\n|=======---|")
+  }
+  if(iter==(max_iter/10)*8){
+    cat("\n|========--|")
+  }
+  if(iter==(max_iter/10)*9){
+    cat("\n|=========-|")
+  }
+  if(iter==max_iter-1){
+    cat("\n|==========|\n")
+  }
 }
 
 slope_mask <- function(fire_name){
@@ -102,23 +146,55 @@ high_severity <- function(fire_name, perimeter, EPSG){
   return(severity_classify)
 }
 
-filter_distance <- function(points, dist){
-  dist_mat <- as.matrix(distance(points))
-  index_list <- list()
-  j <- 1
-  for(i in 1:nrow(dist_mat)){
-    if(all(dist_mat[i,] >= dist)){
-      index_list[j] <- i
-      j <- j+1
+filter_distance <- function(raster, size, min_dist, max_iters=1e6){
+  reso <- res(raster)[1]
+  CRS <- crs(raster)
+  dat <- as.matrix(raster, wide=T)
+  dat <- apply(dat, 2, rev)
+  r <- min_dist/reso
+  # Construct a rejection kernel based on the radius
+  x <- seq(-r, r)
+  y <- seq(-r, r)
+  xx <- expand.grid(x=x,y=y)$x
+  yy <- expand.grid(x=x,y=y)$y
+  rejection_kernel <- sqrt(xx^2 + yy^2)
+  rejection_kernel[rejection_kernel <= r] <- 0
+  rejection_kernel[rejection_kernel > r] <- 1
+  rejection_kernel <- matrix(rejection_kernel, nrow = length(x), byrow = T)
+  
+  rejection_grid <- dat
+  rejection_grid[is.na(rejection_grid)] <- -99
+  samples <- data.frame("x"=rep(NA,size),"y"=rep(NA,size))
+  nc <- 1
+  iters <- 1
+  while(nc <= size){
+    i <- sample(seq(r, nrow(dat)-r),1)
+    j <- sample(seq(r, ncol(dat)-r),1)
+    if(rejection_grid[i,j]==1){
+      if(all(rejection_grid[(i-r):(i+r),(j-r):(j+r)]!=0)){
+        rejection_grid[(i-r):(i+r),(j-r):(j+r)] <- rejection_grid[(i-r):(i+r),(j-r):(j+r)] * rejection_kernel
+        samples$x[nc] <- j
+        samples$y[nc] <- i
+        nc <- nc+1
+      }
+    }
+    iters <- iters+1
+    progress_bar(iters,max_iters)
+    if(iters > max_iters){
+      cat("number of points found:", nc)
+      stop('Maximum number of iterations exceeded')
     }
   }
-  points$values <- points$values[index_list,]
-  points_spaced <- sample(points, size = 5)
-  return(points_spaced)
+  samples$x <- samples$x * reso + xmin(raster)
+  samples$y <- samples$y * reso + ymin(raster)
+  vector <- vect(samples, geom=c("x", "y"), crs=CRS, keepgeom=FALSE)
+  return(vector)
 }
 
-ca_fires <- c("Caldor","KNP")
-for(fire_name in ca_fires){
+# ca_fires <- c("Caldor","KNP")
+wa_fires <- c("Muckamuck","CedarCreek")
+# for(fire_name in ca_fires){
+for(fire_name in wa_fires){
   print(fire_name)
   perimeter <- vect(here(fire_name,paste0(fire_name,"_perimeter.shp")))
   # limit to within 800m of (but at least 200m from) a drainage
@@ -141,12 +217,9 @@ for(fire_name in ca_fires){
   drainage_23 <- clip_to_fire(slope_23, drainages_fire, EPSG)
   drainage_23_project <- project(drainage_23, severity, method = "near")
   drainage_23_severe <- severity * drainage_23_project
-  # randomly sample sites
+  # randomly sample sites, making sure they are at least 2km apart
   print("   sample")
-  sample_sites <- spatSample(drainage_23_severe, size = 50, method = "random", as.points = T, na.rm = T, warn = F)
-  # make sure they are at least 2km apart
-  print("   space")
-  sample_sites_spaced <- filter_distance(sample_sites, 2000)
+  sample_sites_spaced <- filter_distance(drainage_23_severe, size = 5, min_dist = 2000)
   if(nrow(sample_sites_spaced)==5){
     print("   write")
     writeVector(sample_sites_spaced, here(fire_name,paste0(fire_name,"_sample_sites_NJT.shp")),overwrite=T)
@@ -156,10 +229,10 @@ for(fire_name in ca_fires){
 }
 
 
-
 ggplot() +
   geom_spatvector(data = perimeter) +
   geom_spatraster(data = drainage_23_severe) +
   scale_fill_terrain_c() +
   geom_spatvector(data = sample_sites_spaced) +
+  geom_spatvector(data = sample_sites, color = "red")
   theme_bw()
