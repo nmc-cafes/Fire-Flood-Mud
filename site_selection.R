@@ -10,23 +10,19 @@ library(here)
 library(tidyverse)
 library(terra)
 library(tidyterra)
-library(spatstat)
 
 EPSG <- 5070
 all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
 
 ## Process fire perimeters 
 # ca_fires <- c("DIXIE","CALDOR","KNP COMPLEX")
-wa_fires <- c("MUCKAMUCK","CEDAR CREEK")
+fires <- c("DIXIE","CALDOR","KNP COMPLEX","MUCKAMUCK","CEDAR CREEK")
 mtbs <- vect(here("mtbs_perimeter_data","mtbs_perims_DD.shp"))
 mtbs$Ig_Date <- as.Date(mtbs$Ig_Date)
 recent_fires <- mtbs[mtbs$Ig_Date > as.Date("2020-01-01")]
-# cali_fires <- recent_fires[startsWith(recent_fires$Event_ID,"CA")]
-wash_fires <- recent_fires[startsWith(recent_fires$Event_ID,"WA")]
-# for(fire in ca_fires){
-for(fire in wa_fires){
-  # focal_fire <- cali_fires[cali_fires$Incid_Name==fire]
-  focal_fire <- wash_fires[wash_fires$Incid_Name==fire]
+focal_fires <- recent_fires[startsWith(recent_fires$Event_ID,"WA") | startsWith(recent_fires$Event_ID,"CA")]
+for(fire in focal_fires){
+  focal_fire <- focal_fires[focal_fires$Incid_Name==fire]
   if(nrow(focal_fire)==1){
     focal_fire <- project(focal_fire, paste0("EPSG:",EPSG))
     plot(focal_fire)
@@ -47,10 +43,8 @@ clip_to_fire <- function(x, perimeter, EPSG){
 }
 
 ## Process DEMs
-# ca_fires <- c("Dixie","Caldor","KNP")
-wa_fires <- c("Muckamuck","CedarCreek")
-# for(fire in ca_fires){
-for(fire in wa_fires){
+fires <- c("Dixie","Caldor","KNP","Muckamuck","CedarCreek")
+for(fire in fires){
   print(fire)
   perimeter <- vect(here(fire,paste0(fire,"_perimeter.shp")))
   file_list <- list.files(here(fire,"DEM"))
@@ -181,8 +175,9 @@ filter_distance <- function(raster, size, min_dist, max_iters=1e6){
     iters <- iters+1
     progress_bar(iters,max_iters)
     if(iters > max_iters){
-      cat("number of points found:", nc)
-      stop('Maximum number of iterations exceeded')
+      cat('Maximum number of iterations reached.\n')
+      cat("number of points found:", nc-1,"\n")
+      break
     }
   }
   samples$x <- samples$x * reso + xmin(raster)
@@ -191,10 +186,8 @@ filter_distance <- function(raster, size, min_dist, max_iters=1e6){
   return(vector)
 }
 
-# ca_fires <- c("Caldor","KNP")
-wa_fires <- c("Muckamuck","CedarCreek")
-# for(fire_name in ca_fires){
-for(fire_name in wa_fires){
+fires <- c("Dixie","Caldor","KNP","Muckamuck","CedarCreek")
+for(fire_name in fires){
   print(fire_name)
   perimeter <- vect(here(fire_name,paste0(fire_name,"_perimeter.shp")))
   # limit to within 800m of (but at least 200m from) a drainage
@@ -217,9 +210,9 @@ for(fire_name in wa_fires){
   drainage_23 <- clip_to_fire(slope_23, drainages_fire, EPSG)
   drainage_23_project <- project(drainage_23, severity, method = "near")
   drainage_23_severe <- severity * drainage_23_project
-  # randomly sample sites, making sure they are at least 2km apart
+  # randomly sample sites, making sure they are at least 1km apart
   print("   sample")
-  sample_sites_spaced <- filter_distance(drainage_23_severe, size = 5, min_dist = 2000)
+  sample_sites_spaced <- filter_distance(drainage_23_severe, size = 5, min_dist = 1000)
   if(nrow(sample_sites_spaced)==5){
     print("   write")
     writeVector(sample_sites_spaced, here(fire_name,paste0(fire_name,"_sample_sites_NJT.shp")),overwrite=T)
