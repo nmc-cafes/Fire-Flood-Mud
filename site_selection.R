@@ -16,7 +16,8 @@ all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basi
 
 ## Process fire perimeters 
 # ca_fires <- c("DIXIE","CALDOR","KNP COMPLEX")
-fires <- c("DIXIE","CALDOR","KNP COMPLEX","MUCKAMUCK","CEDAR CREEK")
+# fires <- c("DIXIE","CALDOR","KNP COMPLEX","MUCKAMUCK","CEDAR CREEK")
+fires <- c("CUB CREEK 2")
 mtbs <- vect(here("mtbs_perimeter_data","mtbs_perims_DD.shp"))
 mtbs$Ig_Date <- as.Date(mtbs$Ig_Date)
 recent_fires <- mtbs[mtbs$Ig_Date > as.Date("2020-01-01")]
@@ -43,7 +44,8 @@ clip_to_fire <- function(x, perimeter, EPSG){
 }
 
 ## Process DEMs
-fires <- c("Dixie","Caldor","KNP","Muckamuck","CedarCreek")
+# fires <- c("Dixie","Caldor","KNP","Muckamuck","CedarCreek")
+fire <- c("CubCreek2")
 for(fire in fires){
   print(fire)
   perimeter <- vect(here(fire,paste0(fire,"_perimeter.shp")))
@@ -186,7 +188,7 @@ filter_distance <- function(raster, size, min_dist, max_iters=1e6){
   return(vector)
 }
 
-fires <- c("Dixie","Caldor","KNP","Muckamuck","CedarCreek")
+fires <- c("Caldor","Muckamuck","CedarCreek")
 for(fire_name in fires){
   print(fire_name)
   perimeter <- vect(here(fire_name,paste0(fire_name,"_perimeter.shp")))
