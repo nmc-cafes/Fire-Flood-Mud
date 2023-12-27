@@ -72,14 +72,25 @@ prog <- vect(here("CedarCreek",
                   "CEDAR_CREEK_2021_PROGRESSION.shp")) %>%
   project("EPSG:5070")
 
-for(i in 1:nrow(prog)){
+dates <- unique(prog$DateCurren)
+dates <- dates[!is.na(dates)]
+
+vect_list <- list()
+for(i in 1:length(dates)){
+  sameday <- prog[prog$DateCurren == dates[i]]
+  fireday <- aggregate(sameday, by = "DateCurren")
+  vect_list[[i]] <- fireday
+}
+prog_agg <- vect(vect_list)
+
+for(i in 1:nrow(prog_agg)){
   plt <- ggplot() +
-    geom_spatvector(data = prog[i]) +
-    xlim(ext(prog)[1],ext(prog)[2]) +
-    ylim(ext(prog)[3],ext(prog)[4]) +
-    ggtitle(prog[i]$DateCurren) +
+    geom_spatvector(data = prog_agg[i]) +
+    xlim(ext(prog_agg)[1],ext(prog_agg)[2]) +
+    ylim(ext(prog_agg)[3],ext(prog_agg)[4]) +
+    ggtitle(prog_agg[i]$DateCurren) +
     theme_bw()
-  date <- as.character(as.Date(prog[i]$DateCurren))
+  date <- as.character(as.Date(prog_agg[i]$DateCurren))
   ggsave(paste0("CedarCreek_",date,".png"),path = here("CedarCreek","Fire_Progression","Gif"))
 }
 
@@ -91,8 +102,7 @@ gifski(png_files = png_files,
 prog$DateCurren <- as.Date(prog$DateCurren)
 
 correct <- prog[!is.na(prog$DateCurren)]
-correct <- correct[correct$DateCurren != "2021-07-12"]
-correct <- correct[correct$DateCurren != "2021-07-13"]
+correct <- correct[correct$DateCurren >= "2021-07-15"]
 correct <- correct[correct$DateCurren != "2021-08-08"]
 
 correct$DateCurren <- as.character(correct$DateCurren)
@@ -184,4 +194,93 @@ writeVector(correct,
             here("CubCreek2",
                  "Fire_Progression",
                  "CUB_CREEK_2_2021_PROGRESSION_CORRECTED.shp"),
+            overwrite=T)
+
+# DIXIE
+prog <- vect(here("Dixie",
+                  "Fire_Progression", 
+                  "DIXIE_SUGAR_2021_PROGRESSION.shp")) %>%
+  project("EPSG:5070")
+
+dates <- unique(prog$DateCurren)
+dates <- dates[!is.na(dates)]
+
+vect_list <- list()
+for(i in 1:length(dates)){
+  sameday <- prog[prog$DateCurren == dates[i]]
+  fireday <- aggregate(sameday, by = "DateCurren")
+  vect_list[[i]] <- fireday
+}
+prog_agg <- vect(vect_list)
+
+for(i in 1:nrow(prog_agg)){
+  plt <- ggplot() +
+    geom_spatvector(data = prog_agg[i]) +
+    xlim(ext(prog_agg)[1],ext(prog_agg)[2]) +
+    ylim(ext(prog_agg)[3],ext(prog_agg)[4]) +
+    ggtitle(prog_agg[i]$DateCurren) +
+    theme_bw()
+  date <- as.character(as.Date(prog_agg[i]$DateCurren))
+  ggsave(paste0("Dixie_",date,".png"),path = here("Dixie","Fire_Progression","Gif"))
+}
+
+png_files <- list.files(here("Dixie","Fire_Progression","Gif"), full.names = T)
+gifski(png_files = png_files, 
+       gif_file = here("Dixie","Fire_Progression","Dixie_Uncorrected.gif"),
+       delay = 0.5)
+
+prog$DateCurren <- as.Date(prog$DateCurren)
+
+correct <- prog[!is.na(prog$DateCurren)]
+
+correct$DateCurren <- as.character(correct$DateCurren)
+writeVector(correct,
+            here("Dixie",
+                 "Fire_Progression",
+                 "DIXIE_2021_PROGRESSION_CORRECTED.shp"),
+            overwrite=T)
+
+# KNP
+prog <- vect(here("KNP",
+                  "Fire_Progression", 
+                  "KNP_COMPLEX_2021_PROGRESSION.shp")) %>%
+  project("EPSG:5070")
+
+dates <- unique(prog$DateCurren)
+dates <- dates[!is.na(dates)]
+
+vect_list <- list()
+for(i in 1:length(dates)){
+  sameday <- prog[prog$DateCurren == dates[i]]
+  fireday <- aggregate(sameday, by = "DateCurren")
+  vect_list[[i]] <- fireday
+}
+prog_agg <- vect(vect_list)
+
+for(i in 1:nrow(prog_agg)){
+  plt <- ggplot() +
+    geom_spatvector(data = prog_agg[i]) +
+    xlim(ext(prog_agg)[1],ext(prog_agg)[2]) +
+    ylim(ext(prog_agg)[3],ext(prog_agg)[4]) +
+    ggtitle(prog_agg[i]$DateCurren) +
+    theme_bw()
+  date <- as.character(as.Date(prog_agg[i]$DateCurren))
+  ggsave(paste0("KNP_",date,".png"),path = here("KNP","Fire_Progression","Gif"))
+}
+
+png_files <- list.files(here("KNP","Fire_Progression","Gif"), full.names = T)
+gifski(png_files = png_files, 
+       gif_file = here("KNP","Fire_Progression","KNP_Uncorrected.gif"),
+       delay = 0.5)
+
+prog$DateCurren <- as.Date(prog$DateCurren)
+
+correct <- prog[!is.na(prog$DateCurren)]
+correct <- correct[correct$DateCurren != "2021-09-21"]
+
+correct$DateCurren <- as.character(correct$DateCurren)
+writeVector(correct,
+            here("KNP",
+                 "Fire_Progression",
+                 "KNP_COMPLEX_2021_PROGRESSION_CORRECTED.shp"),
             overwrite=T)
