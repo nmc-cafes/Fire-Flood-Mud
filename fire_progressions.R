@@ -3,8 +3,8 @@ library(terra)
 library(tidyverse)
 library(tidyterra)
 
-fire_names <- c("CubCreek2")
-caps_names <- c("CUB_CREEK_2")
+fire_names <- c("CedarCreek","CubCreek2","Dixie","Caldor","KNP")
+caps_names <- c("CEDAR_CREEK","CUB_CREEK_2","DIXIE","CALDOR","KNP_COMPLEX")
 dfs <- list()
 
 for(i in 1:length(fire_names)){
@@ -26,9 +26,9 @@ for(i in 1:length(fire_names)){
     burn_day <- all_dates[all_dates$DateCurren == min(all_dates$DateCurren),]$DateCurren
     df$Fire_Name[j] <- fire_names[i]
     df$Site_Name[j] <- sites[j,]$Site_Name
-    df$Fire_Date[j] <- as.character(burn_day)
+    df$Fire_Date[j] <- as.character(burn_day[1])
   }
   dfs[[i]] <- df
 }
-
+sample_sites <- bind_rows(dfs)
 
