@@ -13,7 +13,7 @@ import geopandas as gpd
 os.environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
 import fastfuels_sdk as ff
 
-def run_fastfuels(site_path,site_name,fire_name,ff_path,duet_path,pad=0):
+def run_fastfuels(site_path,site_name,fire_name,duet_path,pad=0):
     shp_name = site_name+"_bounds.shp"
     fgrid_name = site_name+"_fuelgrid.zip"
     shp_path = os.path.join(site_path,shp_name)
@@ -72,4 +72,4 @@ if __name__=='__main__':
     ff_path = os.path.join(site_path, "FastFuels")
     zarr_path = os.path.join(ff_path,fgrid_mutable)
     qf_path = os.path.join(site_path,"QF_Runs", str(plot_size)+"m")
-    run_fastfuels(site_path,site_name,fire_name,ff_path,duet_path,qf_path)
+    run_fastfuels(site_path,site_name,fire_name,duet_path,qf_path)
