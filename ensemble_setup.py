@@ -16,14 +16,12 @@ import shutil
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-import rasterio as rio
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from shapely import Polygon
 from meteostat import Point, Daily
 from time import sleep
 from datetime import datetime
-from rasterio.enums import Resampling
 from TTRS_QUICFire_Support import plot_array
 from scipy.io import FortranFile
 os.environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
