@@ -6,10 +6,8 @@ Created on Fri Aug 18 08:52:18 2023
 @author: ntutland
 """
 
-import rpy2
 import os
 os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Resources"
-import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
 utils = importr('utils')
