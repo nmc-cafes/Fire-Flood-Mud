@@ -28,7 +28,7 @@ from os import environ, chdir
 environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
 import fastfuels_sdk as fastfuels
 import quicfire_tools as qft
-import r_funcs as r
+# import r_funcs as r
 import sys
 sys.path.insert(0,"/Users/ntutland/Documents/Projects/fastfuels-sdk-python/fastfuels_sdk")
 import exports as exp
@@ -62,7 +62,7 @@ def main():
             qf_run.get_ignition()
             qf_run.draw_ignition()
             qf_run.run_duet()
-            qf_run.query_dNBR()
+            # qf_run.query_dNBR()
             qf_run.quicfire_simulation()
 
     duet = _read_dat_file(qf_run.site_path, "surface_rhof.dat", arr_dim = (2, qf_run.nx, qf_run.ny), order = "F")
@@ -100,7 +100,7 @@ class QuicfireRun:
         self.fire_path = OG_PATH / fire_name
         qf_name = "_".join(fire_name,site_name,str(domain_size)+"m")
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
-        self.site_path = OG_PATH / fire_name / "Sample_Sites" / site_name
+        self.site_path = OG_PATH / fire_name / "Sample_Sites" / site_name / str(domain_size)+"m"
         # Filenames
         self.shp_name = self.site_name+"_bounds_"+str(self.domain_size)+"m.shp"
         self.fgrid_name = self.site_name+"_fuelgrid.zip"
@@ -259,12 +259,12 @@ class QuicfireRun:
         else:
             print("DUET has already been run and calibrated. To rerun, set self.duet_done to False")
     
-    def query_dNBR(self):
-        if self.severity_done == False:
-            self._crop_severity()
-            # TODO: figure out alignment of dNBR and quicfire
-        else:
-            print("Fire severity already queried. To rerun, set self.severity_done to False")
+    # def query_dNBR(self):
+    #     if self.severity_done == False:
+    #         self._crop_severity()
+    #         # TODO: figure out alignment of dNBR and quicfire
+    #     else:
+    #         print("Fire severity already queried. To rerun, set self.severity_done to False")
     
     def draw_ignition(self):
         """
@@ -367,7 +367,7 @@ class QuicfireRun:
         print("ignite.dat written to {}".format(self.qf_path))
     
     def _copy_duet(self):
-        files = ["duet","FIA_FastFuels_fin_fulllist_populated.txt"]
+        files = ["duet","duet.in","FIA_FastFuels_fin_fulllist_populated.txt"]
         for file in files:
             src = self.OG_PATH / "Duet" / file
             dst = self.site_path / file
@@ -388,25 +388,25 @@ class QuicfireRun:
         self.duet_done = True
         
     
-    def _crop_severity(self):   
-        xmin = self.fgrid_zarr.attrs['xmin']
-        xmax = self.fgrid_zarr.attrs['xmax']
-        ymin = self.fgrid_zarr.attrs['ymin']
-        ymax = self.fgrid_zarr.attrs['ymax']
-        pad = 30/2
-        xmin,xmax,ymin,ymax = xmin+pad, xmax-pad, ymin+pad, ymax-pad
-        bbox = Polygon([(xmin,ymin),
-                        (xmax,ymin),
-                        (xmax,ymax),
-                        (xmin,ymax),
-                        (xmin,ymin)])
-        severity_path = self.fire_path / self.dnbr_name
-        shp_name = "_".join([self.site_name,str(self.domain_size),"dNBR.shp"])
-        rst_name = "_".join([self.site_name,str(self.domain_size),"dNBR.tif"])
-        shp_path = self.site_path / shp_name
-        out_path = self.site_path / rst_name
-        gpd.GeoDataFrame(index=[0], geometry=[bbox], crs='epsg:{}'.format(self.EPSG)).to_file(shp_path)
-        r.terra_crop(severity_path, shp_path, out_path)
+    # def _crop_severity(self):   
+    #     xmin = self.fgrid_zarr.attrs['xmin']
+    #     xmax = self.fgrid_zarr.attrs['xmax']
+    #     ymin = self.fgrid_zarr.attrs['ymin']
+    #     ymax = self.fgrid_zarr.attrs['ymax']
+    #     pad = 30/2
+    #     xmin,xmax,ymin,ymax = xmin+pad, xmax-pad, ymin+pad, ymax-pad
+    #     bbox = Polygon([(xmin,ymin),
+    #                     (xmax,ymin),
+    #                     (xmax,ymax),
+    #                     (xmin,ymax),
+    #                     (xmin,ymin)])
+    #     severity_path = self.fire_path / self.dnbr_name
+    #     shp_name = "_".join([self.site_name,str(self.domain_size),"dNBR.shp"])
+    #     rst_name = "_".join([self.site_name,str(self.domain_size),"dNBR.tif"])
+    #     shp_path = self.site_path / shp_name
+    #     out_path = self.site_path / rst_name
+    #     gpd.GeoDataFrame(index=[0], geometry=[bbox], crs='epsg:{}'.format(self.EPSG)).to_file(shp_path)
+    #     r.terra_crop(severity_path, shp_path, out_path)
     
     def _import_fgrid_zarr(self):
         zarr_path = self.qf_path / self.mutable_name

@@ -7,14 +7,14 @@ Created on Fri Aug 18 08:52:18 2023
 """
 
 import os
-os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Resources"
+os.environ['R_HOME'] = "/Users/ntutland/anaconda3/envs/fire-flood-mud/lib/R"
 from rpy2.robjects.packages import importr
 
 utils = importr('utils')
 base = importr('base')
 
-# utils.chooseCRANmirror(ind=74)
-# utils.install_packages('terra')
+utils.chooseCRANmirror(ind=74)
+utils.install_packages('terra')
 
 terra = importr('terra')
 
