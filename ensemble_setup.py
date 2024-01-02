@@ -12,7 +12,7 @@ import pylab
 import zarr
 import json
 import subprocess
-import shutil
+from shutil import copy
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -63,28 +63,12 @@ def main():
             qf_run.draw_ignition()
             qf_run.run_duet()
             qf_run.query_dNBR()
-
-            # create qf input files
-            sim = qft.SimulationInputs.create_simulation(qf_run.nx, 
-                                                 qf_run.ny, 
-                                                 fire_nz=qf_run.nz,
-                                                 wind_speed=qf_run.wind_speed,
-                                                 simulation_time=3600
-                                                 )
-            sim.set_custom_simulation()
-            sim.quic_fire.fuel_flag = 4
-            sim.quic_fire.auto_kill = 1
-
-            # assemble ensemble
-            qf_run.qf_path.mkdir(exist_ok=True)
-            sim.write_inputs(qf_run.qf_path)
-            #TODO: copy dat files and exe
+            qf_run.quicfire_simulation()
 
     duet = _read_dat_file(qf_run.site_path, "surface_rhof.dat", arr_dim = (2, qf_run.nx, qf_run.ny), order = "F")
     plot_array(duet[0,:,:],1, "duet","")
     cali = _read_dat_file(qf_run.site_path, "treesrhof.dat", arr_dim = (qf_run.nz, qf_run.nx, qf_run.ny), order = "C")
     plot_array(cali[0,:,:],1, "duet","")
-
     
 
 class QuicfireRun:
@@ -309,6 +293,56 @@ class QuicfireRun:
         self._draw_arrow()
         plt.show()
     
+    def quicfire_simulation(self):
+            sim = qft.SimulationInputs.create_simulation(
+                self.nx, 
+                self.ny, 
+                fire_nz=self.nz,
+                wind_speed=self.wind_speed,
+                simulation_time=3600
+                )
+            sim.set_custom_simulation()
+            sim.quic_fire.fuel_flag = 4
+            sim.quic_fire.auto_kill = 1
+
+            # assemble ensemble
+            self.qf_path.mkdir(exist_ok=True)
+            sim.write_inputs(self.qf_path)
+
+            # copy dat files and exe
+            # dat files
+            dat_files = [
+                "ignite.dat",
+                "treesrhof.dat",
+                "treesmoist.dat",
+                "treesfueldepth.dat"
+            ]
+            for file in dat_files:
+                src = self.site_path / file
+                dst = self.qf_path / file
+                copy(src,dst)
+            # exe
+            exe_src = Path("/Users/ntutland/Documents/Quicfire/QF_5.3.1/exe/quicfire_MACI.exe")
+            exe_dst = self.qf_path / "quicfire_MACI.exe"
+            copy(exe_src,exe_dst)
+            # drawfire
+            drawfire = [
+                "class_def.py",
+                "drawfire.py",
+                "fuel_vocels.py",
+                "gen_images.py",
+                "misc.py",
+                "PyVistaQF.py",
+                "PyVistaQF_NJT.py",
+                "PyVistaQF_example.inp",
+                "quicfire_vis.py",
+                "read_inputs.py",
+            ]
+            for file in drawfire:
+                src = Path("/Users/ntutland/Documents/Quicfire/QF_5.3.1/scripts/postprocessing/python3") / file
+                dst = self.qf_path / file
+                copy(src,dst)
+  
     def _write_ignite(self):
         """
         Write an ignite.dat file to the QUIC-Fire run directory.
@@ -339,7 +373,7 @@ class QuicfireRun:
             dst = self.site_path / file
             if not src.exists():
                 raise FileNotFoundError("run_duet: {} not found in Duet directory".format(file))
-            shutil.copy(src, dst)
+            copy(src, dst)
     
     def _calibrate_duet(self):
         # Calibrate duet
