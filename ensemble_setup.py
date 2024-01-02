@@ -6,7 +6,7 @@ Created on Tue Oct 10 08:45:22 2023
 @author: ntutland
 """
 
-import os
+from pathlib import Path
 import math
 import pylab
 import zarr
@@ -24,7 +24,8 @@ from time import sleep
 from datetime import datetime
 from TTRS_QUICFire_Support import plot_array
 from scipy.io import FortranFile
-os.environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
+from os import environ, chdir
+environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
 import fastfuels_sdk as fastfuels
 import quicfire_tools as qft
 import r_funcs as r
@@ -33,19 +34,29 @@ sys.path.insert(0,"/Users/ntutland/Documents/Projects/fastfuels-sdk-python/fastf
 import exports as exp
 
 def main():
-    fire_df = pd.read_csv("Sample_Sites_NJT.csv")
+    HERE = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud")
+    sites_path = HERE / "Sample_sites_NJT.csv"
+    fire_df = pd.read_csv(sites_path)
     fire_gdf = gpd.GeoDataFrame(fire_df,
                                 geometry = gpd.points_from_xy(fire_df['X'], fire_df['Y']),
                                 crs = 'EPSG:5070')
     for i in range(len(fire_gdf.index)):
         for j in [500,1000]:
-            fire_name = fire_gdf.iloc[i]["fire_name"]
-            site_name = fire_gdf.iloc[i]["site_name"]
-            fire_date = fire_gdf.iloc[i]["fire_date"]
+            fire_name = fire_gdf.iloc[i]["Fire_Name"]
+            site_name = fire_gdf.iloc[i]["Site_Name"]
+            fire_date = fire_gdf.iloc[i]["Fire_Date"]
             site_coords = fire_gdf.iloc[i]["geometry"]
             domain_size = j
+            og_path = HERE
             
-            qf_run = QuicfireRun(fire_name, site_name, fire_date, site_coords, domain_size)
+            # prepare simulation 
+            qf_run = QuicfireRun(fire_name, 
+                                 site_name, 
+                                 fire_date, 
+                                 site_coords, 
+                                 domain_size, 
+                                 og_path)
+                                 
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
             qf_run.get_ignition()
@@ -53,6 +64,7 @@ def main():
             qf_run.run_duet()
             qf_run.query_dNBR()
 
+            # create qf input files
             sim = qft.SimulationInputs.create_simulation(qf_run.nx, 
                                                  qf_run.ny, 
                                                  fire_nz=qf_run.nz,
@@ -63,12 +75,14 @@ def main():
             sim.quic_fire.fuel_flag = 4
             sim.quic_fire.auto_kill = 1
 
-            qf_dir = "_".join(qf_run.fire_name,qf_run.site_name,qf_run.domain_size)
-            sim.write_inputs(os.path.join("QF_runs",qf_dir))
+            # assemble ensemble
+            qf_run.qf_path.mkdir(exist_ok=True)
+            sim.write_inputs(qf_run.qf_path)
+            #TODO: copy dat files and exe
 
-    duet = _read_dat_file(qf_run.qf_path, "surface_rhof.dat", arr_dim = (2, qf_run.nx, qf_run.ny), order = "F")
+    duet = _read_dat_file(qf_run.site_path, "surface_rhof.dat", arr_dim = (2, qf_run.nx, qf_run.ny), order = "F")
     plot_array(duet[0,:,:],1, "duet","")
-    cali = _read_dat_file(qf_run.qf_path, "treesrhof.dat", arr_dim = (qf_run.nz, qf_run.nx, qf_run.ny), order = "C")
+    cali = _read_dat_file(qf_run.site_path, "treesrhof.dat", arr_dim = (qf_run.nz, qf_run.nx, qf_run.ny), order = "C")
     plot_array(cali[0,:,:],1, "duet","")
 
     
@@ -80,13 +94,15 @@ class QuicfireRun:
                  fire_date,
                  site_coords,
                  domain_size, 
+                 og_path,
                  EPSG = 5070, 
                  buffer = 50,
                  burnplot_done = False, 
                  fastfuels_done = False, 
                  duet_done = False, 
-                 severity_done = False):
-        OG_PATH = os.getcwd()
+                 severity_done = False
+                 ):
+        OG_PATH = og_path
         self.OG_PATH = OG_PATH
         self.fire_name = fire_name
         self.site_name = site_name
@@ -97,9 +113,10 @@ class QuicfireRun:
         self.buffer = buffer
         self.ignition_pace = 5
         # Paths
-        self.fire_path = os.path.join(OG_PATH, fire_name)
-        self.site_path = os.path.join(self.fire_path,"Sample_Sites", site_name)
-        self.qf_path = os.path.join(self.site_path,str(self.domain_size)+"m")
+        self.fire_path = OG_PATH / fire_name
+        qf_name = "_".join(fire_name,site_name,str(domain_size)+"m")
+        self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
+        self.site_path = OG_PATH / fire_name / "Sample_Sites" / site_name
         # Filenames
         self.shp_name = self.site_name+"_bounds_"+str(self.domain_size)+"m.shp"
         self.fgrid_name = self.site_name+"_fuelgrid.zip"
@@ -118,10 +135,9 @@ class QuicfireRun:
         self.ny = self.fgrid_zarr.attrs["ny"] if fastfuels_done else None
         self.nz = self.fgrid_zarr.attrs["nz"] if fastfuels_done else None
         # Make dirs
-        paths = [self.fire_path, self.site_path, self.qf_path]
+        paths = [self.fire_path, self.qf_path, self.site_path]
         for path in paths:
-            if not os.path.exists(path):
-                os.makedirs(path)
+            path.mkdir(exist_ok = True)
         
     def create_burnplot(self):
         if self.burnplot_done == False:
@@ -129,7 +145,8 @@ class QuicfireRun:
             site_poly = self._make_bbox(full_size)
 
             site_bounds = gpd.GeoDataFrame(site_poly)
-            site_bounds.to_file(os.path.join(self.qf_path, self.shp_name))
+            shp_path = self.site_path / self.shp_name
+            site_bounds.to_file(shp_path)
             
             self.burnplot_done = True
         else:
@@ -139,9 +156,9 @@ class QuicfireRun:
         if not self.burnplot_done:
             raise Exception("run_fastfuels: Burn plot must be created before running fastfuels")
         if self.fastfuels_done == False:
-            shp_path = os.path.join(self.qf_path,self.shp_name)
-            fgrid_path = os.path.join(self.qf_path,self.fgrid_name)
-            mutable_path = os.path.join(self.qf_path, self.mutable_name)
+            shp_path = self.site_path / self.shp_name
+            fgrid_path = self.site_path / self.fgrid_name
+            mutable_path = self.site_path / self.mutable_name
     
             # Load a spatial data file
             gdf = gpd.read_file(shp_path).to_crs(self.EPSG)
@@ -182,8 +199,8 @@ class QuicfireRun:
             # Copy the data from the immutable zarr store to the mutable zarr store
             zarr.copy_all(zroot, zarr_mutable)
     
-            fastfuels.export_zarr_to_duet(zroot, self.qf_path, seed=47, wind_dir=self.wind_dir, wind_var=360, duration=5)
-            fastfuels.export_zarr_to_quicfire(zroot, self.qf_path)
+            fastfuels.export_zarr_to_duet(zroot, self.site_path, seed=47, wind_dir=self.wind_dir, wind_var=360, duration=5)
+            fastfuels.export_zarr_to_quicfire(zroot, self.site_path)
             
             self.fastfuels_done = True
             self.nx = zroot.attrs["nx"]
@@ -234,13 +251,13 @@ class QuicfireRun:
     def run_duet(self):
         if self.duet_done == False:
             self._copy_duet()
-            # import fastfuels_sdk
             required = ["duet", "duet.in", "FIA_FastFuels_fin_fulllist_populated.txt"]
             for file in required:
-                if not os.path.exists(os.path.join(self.qf_path,file)):
+                test_path = self.site_path / file
+                if not test_path.exists():
                     raise FileNotFoundError("run_duet: {} not found".format(file))
             # run DUET
-            os.chdir(self.qf_path)
+            chdir(self.qf_path)
             with subprocess.Popen(
                 ["./duet"], stdout=subprocess.PIPE
             ) as process:
@@ -253,7 +270,7 @@ class QuicfireRun:
                     sleep(1)
                 if process.poll()==0:
                     print('DUET run successfully')
-            os.chdir(self.OG_PATH)
+            chdir(self.OG_PATH)
             self._calibrate_duet()
         else:
             print("DUET has already been run and calibrated. To rerun, set self.duet_done to False")
@@ -261,29 +278,30 @@ class QuicfireRun:
     def query_dNBR(self):
         if self.severity_done == False:
             self._crop_severity()
+            # TODO: figure out alignment of dNBR and quicfire
             # this is slightly mis-aligned, so the nodata at the edges needs to be removed
             # self.mask_nodata()
             # upsample to qf resolution
-            self._upsample_raster()
-            # crop to the study area
-            self._crop_to_site()
-            # delete intermediate files
-            filelist = [os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","mask.tif"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.shp"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.cpg"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.dbf"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.prj"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.shx"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","upsample.tif"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.shp"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.cpg"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.dbf"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.prj"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.shx"])),
-                        os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.tif"]))]
-            for file in filelist:
-                if os.path.exists(file):
-                    os.remove(file)
+            # self._upsample_raster()
+            # # crop to the study area
+            # self._crop_to_site()
+            # # delete intermediate files
+            # filelist = [os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","mask.tif"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.shp"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.cpg"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.dbf"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.prj"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.shx"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","upsample.tif"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.shp"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.cpg"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.dbf"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.prj"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.shx"])),
+            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.tif"]))]
+            # for file in filelist:
+            #     if os.path.exists(file):
+            #         os.remove(file)
         else:
             print("Fire severity already queried. To rerun, set self.severity_done to False")
     
@@ -326,7 +344,8 @@ class QuicfireRun:
         """
         start_loc, end_loc = self.ignition_coords
         duration = _ignition_duration(start_loc, end_loc, self.ignition_pace)
-        with open(os.path.join(self.qf_path,"ignite.dat"), "w") as file:
+        ignite_path = self.site_path / "ignite.dat"
+        with open(ignite_path, "w") as file:
             file.write("igntype=5\n")
             file.write("&atvlist\n")
             file.write("natv=1\n")
@@ -339,19 +358,19 @@ class QuicfireRun:
     def _copy_duet(self):
         files = ["duet","FIA_FastFuels_fin_fulllist_populated.txt"]
         for file in files:
-            if not os.path.exists(os.path.join("Duet", file)):
+            src = self.OG_PATH / "Duet" / file
+            dst = self.site_path / file
+            if not src.exists():
                 raise FileNotFoundError("run_duet: {} not found in Duet directory".format(file))
-        for file in files:
-            dst = os.path.join(self.qf_path,file)
-            src = os.path.join("Duet",file)
             shutil.copy(src, dst)
     
     def _calibrate_duet(self):
         # Calibrate duet
         print("Calibrating DUET to SB40 fuel loading values")
-        if not os.path.exists("sb40_parameters.csv"):
+        param_path = self.OG_PATH / "sb40_parameters.csv"
+        if not param_path.exists():
             raise FileNotFoundError("run_duet: file sb40_parameters.csv not found in base directory")
-        dc = exp.DuetCalibrator(self.fgrid_zarr,self.qf_path,self.OG_PATH)
+        dc = exp.DuetCalibrator(self.fgrid_zarr,self.site_path,self.OG_PATH)
         dc.calibrate_with_sb40(["grass","litter"])
         dc.to_file()
         dc.replace_quicfire_surface_fuels()
@@ -370,9 +389,11 @@ class QuicfireRun:
                         (xmax,ymax),
                         (xmin,ymax),
                         (xmin,ymin)])
-        severity_path = os.path.join(self.fire_path, self.dnbr_name)
-        shp_path = os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.shp"]))
-        out_path = os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.tif"]))
+        severity_path = self.fire_path / self.dnbr_name
+        shp_name = "_".join([self.site_name,str(self.domain_size),"dNBR.shp"])
+        rst_name = "_".join([self.site_name,str(self.domain_size),"dNBR.tif"])
+        shp_path = self.site_path / shp_name
+        out_path = self.site_path / rst_name
         gpd.GeoDataFrame(index=[0], geometry=[bbox], crs='epsg:{}'.format(self.EPSG)).to_file(shp_path)
         r.terra_crop(severity_path, shp_path, out_path)
     
@@ -434,11 +455,12 @@ class QuicfireRun:
     #     r.terra_crop(rst_path, shp_path, out_path)
     
     def _import_fgrid_zarr(self):
-        zroot = zarr.open(os.path.join(self.qf_path, self.mutable_name), mode = 'r')
+        zarr_path = self.qf_path / self.mutable_name
+        zroot = zarr.open(zarr_path, mode = 'r')
         return zroot
     
     def _meteostat(self):
-        sites = os.path.join(self.fire_path,self.fire_name+"_samples_sites_NJT.shp")
+        sites = self.fire_path / self.fire_name+"_samples_sites_NJT.shp"
         sample_sites = gpd.read_file(sites).to_crs(4326)
         center = sample_sites[sample_sites["Site_Name"]==self.site_name].centroid.to_crs(4326)
 
@@ -480,7 +502,7 @@ class QuicfireRun:
 
         
 
-def _read_dat_file(dire: str,
+def _read_dat_file(dire: Path,
                    filename: str,
                    arr_dim: tuple,
                    order: str = "C") -> np.array:
@@ -491,7 +513,8 @@ def _read_dat_file(dire: str,
     """
     
     # Import and reshape .dat file
-    with open(os.path.join(dire, filename), "rb") as fin:
+    path = dire / filename
+    with open(path, "rb") as fin:
             arr = FortranFile(fin).read_reals(dtype="float32").reshape(arr_dim, order=order)
     
     return arr
