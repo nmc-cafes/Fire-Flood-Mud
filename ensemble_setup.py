@@ -279,29 +279,6 @@ class QuicfireRun:
         if self.severity_done == False:
             self._crop_severity()
             # TODO: figure out alignment of dNBR and quicfire
-            # this is slightly mis-aligned, so the nodata at the edges needs to be removed
-            # self.mask_nodata()
-            # upsample to qf resolution
-            # self._upsample_raster()
-            # # crop to the study area
-            # self._crop_to_site()
-            # # delete intermediate files
-            # filelist = [os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","mask.tif"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.shp"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.cpg"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.dbf"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.prj"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.shx"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","upsample.tif"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.shp"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.cpg"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.dbf"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.prj"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.shx"])),
-            #             os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.tif"]))]
-            # for file in filelist:
-            #     if os.path.exists(file):
-            #         os.remove(file)
         else:
             print("Fire severity already queried. To rerun, set self.severity_done to False")
     
@@ -396,63 +373,6 @@ class QuicfireRun:
         out_path = self.site_path / rst_name
         gpd.GeoDataFrame(index=[0], geometry=[bbox], crs='epsg:{}'.format(self.EPSG)).to_file(shp_path)
         r.terra_crop(severity_path, shp_path, out_path)
-    
-    # def _mask_nodata(self):
-    #     import rasterio.windows as rwd
-    #     with rio.open(os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.tif"]))) as sb:
-    #         profile = sb.profile.copy()
-    #         data_window = rwd.get_data_window(sb.read(masked=True))
-    #         data_transform = rwd.transform(data_window, sb.transform)
-    #         profile.update(
-    #             transform=data_transform,
-    #             height=data_window.height,
-    #             width=data_window.width)
-
-    #         data = sb.read(window=data_window)
-    #     with rio.open(os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","mask.tif"])), 'w', **profile) as dst:
-    #         dst.write(data)
-    
-    # def _upsample_raster(self):
-    #     with rio.open(os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR.tif"]))) as sb: 
-    #         upscale_factor = 15 #lf res / qf_res
-    #         profile = sb.profile.copy()
-    #         # resample data to target shape
-    #         data = sb.read(
-    #             out_shape=(
-    #                 sb.count,
-    #                 int(sb.height * upscale_factor),
-    #                 int(sb.width * upscale_factor)
-    #             ),
-    #             resampling=Resampling.nearest
-    #         )
-        
-    #         # scale image transform
-    #         transform = sb.transform * sb.transform.scale(
-    #             (sb.width / data.shape[-1]),
-    #             (sb.height / data.shape[-2])
-    #         )
-    #         profile.update({"height": data.shape[-2],
-    #                     "width": data.shape[-1],
-    #                    "transform": transform})
-    #         with rio.open(os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","upsample.tif"])), "w", **profile) as dataset:
-    #             dataset.write(data)
-    
-    # def _crop_to_site(self):
-    #     xmin = self.fgrid_zarr.attrs['xmin']
-    #     xmax = self.fgrid_zarr.attrs['xmax']
-    #     ymin = self.fgrid_zarr.attrs['ymin']
-    #     ymax = self.fgrid_zarr.attrs['ymax']
-    #     xmin,xmax,ymin,ymax = xmin-1, xmax+1, ymin-1, ymax+1
-    #     bbox = Polygon([(xmin,ymin),
-    #                     (xmax,ymin),
-    #                     (xmax,ymax),
-    #                     (xmin,ymax),
-    #                     (xmin,ymin)])
-    #     rst_path = os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","upsample.tif"]))
-    #     shp_path = os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.shp"]))
-    #     out_path = os.path.join(self.qf_path, "_".join([self.site_name,str(self.domain_size),"dNBR","crop.tif"]))
-    #     gpd.GeoDataFrame(index=[0], geometry=[bbox], crs='epsg:{}'.format(self.EPSG)).to_file(shp_path)
-    #     r.terra_crop(rst_path, shp_path, out_path)
     
     def _import_fgrid_zarr(self):
         zarr_path = self.qf_path / self.mutable_name
