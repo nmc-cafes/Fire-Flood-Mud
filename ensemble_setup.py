@@ -26,16 +26,17 @@ from TTRS_QUICFire_Support import plot_array
 from scipy.io import FortranFile
 os.environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
 import fastfuels_sdk as fastfuels
+import quicfire_tools as qft
 import r_funcs as r
 import sys
 sys.path.insert(0,"/Users/ntutland/Documents/Projects/fastfuels-sdk-python/fastfuels_sdk")
 import exports as exp
 
 def main():
-    fire_df = pd.read_csv("Sample_Sites.csv")
+    fire_df = pd.read_csv("Sample_Sites_NJT.csv")
     fire_gdf = gpd.GeoDataFrame(fire_df,
-                                geometry = gpd.points_from_xy(fire_df['longitude'], fire_df['latitude']),
-                                crs = 'EPSG:4326').to_crs(5070)
+                                geometry = gpd.points_from_xy(fire_df['X'], fire_df['Y']),
+                                crs = 'EPSG:5070')
     for i in range(len(fire_gdf.index)):
         for j in [500,1000]:
             fire_name = fire_gdf.iloc[i]["fire_name"]
@@ -52,11 +53,26 @@ def main():
             qf_run.run_duet()
             qf_run.query_dNBR()
 
+            sim = qft.SimulationInputs.create_simulation(qf_run.nx, 
+                                                 qf_run.ny, 
+                                                 fire_nz=qf_run.nz,
+                                                 wind_speed=qf_run.wind_speed,
+                                                 simulation_time=3600
+                                                 )
+            sim.set_custom_simulation()
+            sim.quic_fire.fuel_flag = 4
+            sim.quic_fire.auto_kill = 1
+
+            qf_dir = "_".join(qf_run.fire_name,qf_run.site_name,qf_run.domain_size)
+            sim.write_inputs(os.path.join("QF_runs",qf_dir))
+
     duet = _read_dat_file(qf_run.qf_path, "surface_rhof.dat", arr_dim = (2, qf_run.nx, qf_run.ny), order = "F")
     plot_array(duet[0,:,:],1, "duet","")
     cali = _read_dat_file(qf_run.qf_path, "treesrhof.dat", arr_dim = (qf_run.nz, qf_run.nx, qf_run.ny), order = "C")
     plot_array(cali[0,:,:],1, "duet","")
+
     
+
 class QuicfireRun:
     def __init__(self, 
                  fire_name, 
@@ -95,7 +111,7 @@ class QuicfireRun:
         self.duet_done = duet_done
         self.severity_done = severity_done
         # Calculated
-        self.wind_dir = self._meteostat_winddir()
+        self.wind_dir, self.wind_speed = self._meteostat()
         self.ignition_coords = None
         self.fgrid_zarr = self._import_fgrid_zarr() if fastfuels_done else None
         self.nx = self.fgrid_zarr.attrs["nx"] if fastfuels_done else None
@@ -421,10 +437,10 @@ class QuicfireRun:
         zroot = zarr.open(os.path.join(self.qf_path, self.mutable_name), mode = 'r')
         return zroot
     
-    def _meteostat_winddir(self):
-        sites = os.path.join(self.fire_path,"Sample_Sites",self.fire_name+"_Samples.shp")
-        sample_sites = gpd.read_file(sites).set_crs(4326)
-        center = sample_sites[sample_sites["site_name"]==self.site_name].centroid.to_crs(4326)
+    def _meteostat(self):
+        sites = os.path.join(self.fire_path,self.fire_name+"_samples_sites_NJT.shp")
+        sample_sites = gpd.read_file(sites).to_crs(4326)
+        center = sample_sites[sample_sites["Site_Name"]==self.site_name].centroid.to_crs(4326)
 
         plot = Point(center[0].y, center[0].x)
 
@@ -436,7 +452,7 @@ class QuicfireRun:
         data = Daily(plot, start, end)
         data = data.fetch()
         
-        return data.wdir[0]
+        return (data.wdir[0], data.wspd[0])
     
     def _make_bbox(self, dim):
         dim = dim/2
