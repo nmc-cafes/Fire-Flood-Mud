@@ -49,12 +49,12 @@ def main():
         crs="EPSG:5070",
     )
     for i in range(len(fire_gdf.index)):
-        for j in [500, 1000]:
+        if i != 0: # Caldor-Camp2 is already done
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
             site_coords = fire_gdf.iloc[i]["geometry"]
-            domain_size = j
+            domain_size = 500
             og_path = HERE
 
             # prepare simulation
