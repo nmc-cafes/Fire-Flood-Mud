@@ -49,13 +49,15 @@ def main():
         crs="EPSG:5070",
     )
     for i in range(len(fire_gdf.index)):
-        if i != 0: # Caldor-Camp2 is already done
+        if i < 5: # Caldor-Camp2 is already done
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
             site_coords = fire_gdf.iloc[i]["geometry"]
             domain_size = 500
             og_path = HERE
+
+            print("\n", fire_name, "-", site_name, "\n")
 
             # prepare simulation
             qf_run = QuicfireRun(
@@ -65,25 +67,25 @@ def main():
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
             qf_run.get_ignition()
-            qf_run.draw_ignition()
+            # qf_run.draw_ignition()
             qf_run.run_duet()
             # qf_run.query_dNBR()
             qf_run.quicfire_simulation()
 
-    duet = _read_dat_file(
-        qf_run.site_path,
-        "surface_rhof.dat",
-        arr_dim=(2, qf_run.nx, qf_run.ny),
-        order="F",
-    )
-    plot_array(duet[0, :, :], 1, "duet", "")
-    cali = _read_dat_file(
-        qf_run.site_path,
-        "treesrhof.dat",
-        arr_dim=(qf_run.nz, qf_run.nx, qf_run.ny),
-        order="C",
-    )
-    plot_array(cali[0, :, :], 1, "duet", "")
+    # duet = _read_dat_file(
+    #     qf_run.site_path,
+    #     "surface_rhof.dat",
+    #     arr_dim=(2, qf_run.nx, qf_run.ny),
+    #     order="F",
+    # )
+    # plot_array(duet[0, :, :], 1, "duet", "")
+    # cali = _read_dat_file(
+    #     qf_run.site_path,
+    #     "treesrhof.dat",
+    #     arr_dim=(qf_run.nz, qf_run.nx, qf_run.ny),
+    #     order="C",
+    # )
+    # plot_array(cali[0, :, :], 1, "duet", "")
 
 
 class QuicfireRun:
@@ -478,8 +480,10 @@ class QuicfireRun:
         center = sample_sites[
             sample_sites["Site_Name"] == self.site_name
         ].centroid.to_crs(4326)
-
-        plot = Point(center[0].y, center[0].x)
+        id = sample_sites.index[
+            sample_sites["Site_Name"] == self.site_name
+        ].tolist()[0]
+        plot = Point(center[id].y, center[id].x)
 
         # Set time period
         start = datetime.strptime(self.fire_date, "%Y-%m-%d")
