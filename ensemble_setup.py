@@ -5,38 +5,31 @@ Created on Tue Oct 10 08:45:22 2023
 
 @author: ntutland
 """
-
+# Core imports
+from os import environ, chdir
 from pathlib import Path
 import math
-import pylab
-import zarr
-import json
 import subprocess
 from shutil import copy
+from time import sleep
+from datetime import datetime
+
+# External imports
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import pylab
+import zarr
+import json
 from shapely import Polygon
 from meteostat import Point, Daily
-from time import sleep
-from datetime import datetime
-from TTRS_QUICFire_Support import plot_array
 from scipy.io import FortranFile
-from os import environ, chdir
-
-environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
 import fastfuels_sdk as fastfuels
 import quicfire_tools as qft
 
-# import r_funcs as r
-import sys
-
-sys.path.insert(
-    0, "/Users/ntutland/Documents/Projects/fastfuels-sdk-python/fastfuels_sdk"
-)
-import exports as exp
+environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
 
 
 def main():
@@ -49,7 +42,7 @@ def main():
         crs="EPSG:5070",
     )
     for i in range(len(fire_gdf.index)):
-        if i < 5: # Caldor-Camp2 is already done
+        if i > 23:  # Caldor is already done
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -68,24 +61,7 @@ def main():
             qf_run.run_fastfuels()
             qf_run.get_ignition()
             # qf_run.draw_ignition()
-            qf_run.run_duet()
-            # qf_run.query_dNBR()
             qf_run.quicfire_simulation()
-
-    # duet = _read_dat_file(
-    #     qf_run.site_path,
-    #     "surface_rhof.dat",
-    #     arr_dim=(2, qf_run.nx, qf_run.ny),
-    #     order="F",
-    # )
-    # plot_array(duet[0, :, :], 1, "duet", "")
-    # cali = _read_dat_file(
-    #     qf_run.site_path,
-    #     "treesrhof.dat",
-    #     arr_dim=(qf_run.nz, qf_run.nx, qf_run.ny),
-    #     order="C",
-    # )
-    # plot_array(cali[0, :, :], 1, "duet", "")
 
 
 class QuicfireRun:
@@ -289,10 +265,10 @@ class QuicfireRun:
                 def poll_and_read():
                     print(f"{process.stdout.read1().decode('utf-8')}")
 
-                while process.poll() != 0:
+                while process.poll() not in [0, -11]:
                     poll_and_read()
                     sleep(1)
-                if process.poll() == 0:
+                if process.poll() in [0, -11]:
                     print("DUET run successfully")
             chdir(self.OG_PATH)
             self._calibrate_duet()
@@ -300,13 +276,6 @@ class QuicfireRun:
             print(
                 "DUET has already been run and calibrated. To rerun, set self.duet_done to False"
             )
-
-    # def query_dNBR(self):
-    #     if self.severity_done == False:
-    #         self._crop_severity()
-    #         # TODO: figure out alignment of dNBR and quicfire
-    #     else:
-    #         print("Fire severity already queried. To rerun, set self.severity_done to False")
 
     def draw_ignition(self):
         """
@@ -435,20 +404,6 @@ class QuicfireRun:
                 )
             copy(src, dst)
 
-    def _calibrate_duet(self):
-        # Calibrate duet
-        print("Calibrating DUET to SB40 fuel loading values")
-        param_path = self.OG_PATH / "sb40_parameters.csv"
-        if not param_path.exists():
-            raise FileNotFoundError(
-                "run_duet: file sb40_parameters.csv not found in base directory"
-            )
-        dc = exp.DuetCalibrator(self.fgrid_zarr, self.site_path, self.OG_PATH)
-        dc.calibrate_with_sb40(["grass", "litter"])
-        dc.to_file()
-        dc.replace_quicfire_surface_fuels()
-        self.duet_done = True
-
     # def _crop_severity(self):
     #     xmin = self.fgrid_zarr.attrs['xmin']
     #     xmax = self.fgrid_zarr.attrs['xmax']
@@ -480,10 +435,15 @@ class QuicfireRun:
         center = sample_sites[
             sample_sites["Site_Name"] == self.site_name
         ].centroid.to_crs(4326)
-        id = sample_sites.index[
-            sample_sites["Site_Name"] == self.site_name
-        ].tolist()[0]
+        id = sample_sites.index[sample_sites["Site_Name"] == self.site_name].tolist()[0]
         plot = Point(center[id].y, center[id].x)
+        plot.radius = 60000
+
+        # from meteostat import Stations
+        # stations = Stations()
+        # stations = stations.nearby(center[id].y, center[id].x)
+        # station = stations.fetch(1)
+        # print(station)
 
         # Set time period
         start = datetime.strptime(self.fire_date, "%Y-%m-%d")
