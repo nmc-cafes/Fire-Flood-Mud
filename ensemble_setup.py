@@ -9,7 +9,6 @@ Created on Tue Oct 10 08:45:22 2023
 from os import environ, chdir
 from pathlib import Path
 import math
-import subprocess
 from shutil import copy
 from time import sleep
 from datetime import datetime
@@ -26,10 +25,10 @@ import json
 from shapely import Polygon
 from meteostat import Point, Daily
 from scipy.io import FortranFile
-import fastfuels_sdk as fastfuels
-import quicfire_tools as qft
 
 environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
+import fastfuels_sdk as fastfuels
+import quicfire_tools as qft
 
 
 def main():
@@ -59,6 +58,7 @@ def main():
 
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
+            qf_run.correct_fuelheight()
             qf_run.get_ignition()
             # qf_run.draw_ignition()
             qf_run.quicfire_simulation()
@@ -210,6 +210,15 @@ class QuicfireRun:
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
             )
 
+    def correct_fuelheight(self):
+        """Corrects the treesfueldepth.dat file by filling all non-surface layers with 1's"""
+
+        height = _read_dat_file(
+            self.site_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
+        )
+        height[1:, :, :] = 1.0
+        _write_array_to_dat(height, "treesfueldepth.dat", self.site_path, reshape=False)
+
     def get_ignition(self):
         """
         Generate an ignition line based on wind direction that resides outside of
@@ -249,33 +258,6 @@ class QuicfireRun:
 
         self.ignition_coords = [start, end]
         self._write_ignite()
-
-    def run_duet(self):
-        if self.duet_done == False:
-            self._copy_duet()
-            required = ["duet", "duet.in", "FIA_FastFuels_fin_fulllist_populated.txt"]
-            for file in required:
-                test_path = self.site_path / file
-                if not test_path.exists():
-                    raise FileNotFoundError("run_duet: {} not found".format(file))
-            # run DUET
-            chdir(self.site_path)
-            with subprocess.Popen(["./duet"], stdout=subprocess.PIPE) as process:
-
-                def poll_and_read():
-                    print(f"{process.stdout.read1().decode('utf-8')}")
-
-                while process.poll() not in [0, -11]:
-                    poll_and_read()
-                    sleep(1)
-                if process.poll() in [0, -11]:
-                    print("DUET run successfully")
-            chdir(self.OG_PATH)
-            self._calibrate_duet()
-        else:
-            print(
-                "DUET has already been run and calibrated. To rerun, set self.duet_done to False"
-            )
 
     def draw_ignition(self):
         """
@@ -318,8 +300,19 @@ class QuicfireRun:
             simulation_time=3600,
         )
         sim.set_custom_simulation()
-        sim.quic_fire.fuel_flag = 4
+        sim.set_output_files(
+            react_rate=True,
+            fuel_dens=True,
+            fuel_moist=True,
+            mass_burnt=True,
+            radiation=True,
+            surf_eng=True,
+        )
+        sim.quic_fire.fuel_density_flag = 4
+        sim.quic_fire.fuel_moisture_flag = 4
+        sim.quic_fire.ignitions_per_cell = 5
         sim.quic_fire.auto_kill = 1
+        sim.qu_simparams.quic_domain_height = 1000
 
         # assemble ensemble
         self.qf_path.mkdir(exist_ok=True)
@@ -332,6 +325,7 @@ class QuicfireRun:
             "treesrhof.dat",
             "treesmoist.dat",
             "treesfueldepth.dat",
+            "topo.dat",
         ]
         for file in dat_files:
             src = self.site_path / file
@@ -339,30 +333,19 @@ class QuicfireRun:
             copy(src, dst)
         # exe
         exe_src = Path(
-            "/Users/ntutland/Documents/Quicfire/QF_5.3.1/exe/quicfire_MACI.exe"
+            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/exe/quicfire_MACI.exe"
         )
         exe_dst = self.qf_path / "quicfire_MACI.exe"
         copy(exe_src, exe_dst)
         # drawfire
-        drawfire = [
-            "class_def.py",
-            "drawfire.py",
-            "fuel_voxels.py",
-            "gen_images.py",
-            "misc.py",
-            "PyVistaQF.py",
-            "PyVistaQF_NJT.py",
-            "PyVistaQF_example.inp",
-            "quicfire_vis.py",
-            "read_inputs.py",
-        ]
+        drawfire_dir = Path(
+            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3"
+        )
+        drawfire = []
+        for file in drawfire_dir.iterdir():
+            drawfire.append(file.name)
         for file in drawfire:
-            src = (
-                Path(
-                    "/Users/ntutland/Documents/Quicfire/QF_5.3.1/scripts/postprocessing/python3"
-                )
-                / file
-            )
+            src = drawfire_dir / file
             dst = self.qf_path / file
             copy(src, dst)
 
@@ -403,26 +386,6 @@ class QuicfireRun:
                     "run_duet: {} not found in Duet directory".format(file)
                 )
             copy(src, dst)
-
-    # def _crop_severity(self):
-    #     xmin = self.fgrid_zarr.attrs['xmin']
-    #     xmax = self.fgrid_zarr.attrs['xmax']
-    #     ymin = self.fgrid_zarr.attrs['ymin']
-    #     ymax = self.fgrid_zarr.attrs['ymax']
-    #     pad = 30/2
-    #     xmin,xmax,ymin,ymax = xmin+pad, xmax-pad, ymin+pad, ymax-pad
-    #     bbox = Polygon([(xmin,ymin),
-    #                     (xmax,ymin),
-    #                     (xmax,ymax),
-    #                     (xmin,ymax),
-    #                     (xmin,ymin)])
-    #     severity_path = self.fire_path / self.dnbr_name
-    #     shp_name = "_".join([self.site_name,str(self.domain_size),"dNBR.shp"])
-    #     rst_name = "_".join([self.site_name,str(self.domain_size),"dNBR.tif"])
-    #     shp_path = self.site_path / shp_name
-    #     out_path = self.site_path / rst_name
-    #     gpd.GeoDataFrame(index=[0], geometry=[bbox], crs='epsg:{}'.format(self.EPSG)).to_file(shp_path)
-    #     r.terra_crop(severity_path, shp_path, out_path)
 
     def _import_fgrid_zarr(self):
         zarr_path = self.qf_path / self.mutable_name
@@ -508,6 +471,32 @@ def _read_dat_file(
         arr = FortranFile(fin).read_reals(dtype="float32").reshape(arr_dim, order=order)
 
     return arr
+
+
+def _write_array_to_dat(
+    array: np.ndarray,
+    dat_name: str,
+    output_dir: Path,
+    dtype: type = np.float32,
+    reshape: bool = True,
+) -> None:
+    """
+    Write a numpy array to a fortran binary file. Array must be cast to the
+    appropriate data type before calling this function. If the array is 3D,
+    the array will be reshaped from (y, x, z) to (z, y, x) for fortran.
+    """
+    # Reshape array from (y, x, z) to (z, y, x) (also for fortran)
+    if reshape:
+        if len(array.shape) == 3:
+            array = np.moveaxis(array, 2, 0).astype(dtype)
+        else:
+            array = array.astype(dtype)
+    else:
+        array = array.astype(dtype)
+
+    # Write the zarr array to a dat file with scipy FortranFile package
+    with FortranFile(Path(output_dir, dat_name), "w") as f:
+        f.write_record(array)
 
 
 def _ignition_duration(start, end, pace):
