@@ -41,7 +41,7 @@ def main():
         crs="EPSG:5070",
     )
     for i in range(len(fire_gdf.index)):
-        if i > 23:  # Caldor is already done
+        if i == 14:  # Caldor is already done
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -53,14 +53,19 @@ def main():
 
             # prepare simulation
             qf_run = QuicfireRun(
-                fire_name, site_name, fire_date, site_coords, domain_size, og_path
+                fire_name,
+                site_name,
+                fire_date,
+                site_coords,
+                domain_size,
+                og_path,
             )
 
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
             qf_run.correct_fuelheight()
             qf_run.get_ignition()
-            # qf_run.draw_ignition()
+            qf_run.draw_ignition()
             qf_run.quicfire_simulation()
 
 
@@ -230,26 +235,26 @@ class QuicfireRun:
             )
         # Get coordinates of buffer corner nearest to wind direction
         if self.wind_dir < 90:
-            x1, y1 = (self.nx - self.buffer, self.ny - self.buffer)
+            x1, y1 = (self.nx * 2 - self.buffer, self.ny * 2 - self.buffer)
         elif self.wind_dir < 180:
-            x1, y1 = (self.nx - self.buffer, self.buffer)
+            x1, y1 = (self.nx * 2 - self.buffer, self.buffer)
         elif self.wind_dir < 270:
             x1, y1 = (self.buffer, self.buffer)
         else:
-            x1, y1 = (self.buffer, self.ny - self.buffer)
+            x1, y1 = (self.buffer, self.ny * 2 - self.buffer)
 
         theta = (180 - self.wind_dir) % 180
         m = math.tan(math.radians(theta))
 
         L = m * (-x1) + y1
-        T = (self.ny - y1) / m + x1 if m != 0 else float("inf")
-        R = m * (self.nx - x1) + y1
+        T = (self.ny * 2 - y1) / m + x1 if m != 0 else float("inf")
+        R = m * (self.nx * 2 - x1) + y1
         B = (-y1) / m + x1 if m != 0 else float("-inf")
 
-        intersections = ((0, L), (T, self.ny), (self.nx, R), (B, 0))
+        intersections = ((0, L), (T, self.ny * 2), (self.nx * 2, R), (B, 0))
         border_intersections = []
         for j, k in intersections:
-            if 0 <= j <= self.nx and 0 <= k <= self.nx:
+            if 0 <= j <= self.nx * 2 and 0 <= k <= self.nx * 2:
                 border_intersections.append((j, k))
 
         switched = [border_intersections[1], border_intersections[0]]
@@ -274,14 +279,18 @@ class QuicfireRun:
             )
         start_loc, end_loc = self.ignition_coords
         fig, ax = plt.subplots()
-        plt.plot([start_loc[0], end_loc[0]], [start_loc[1], end_loc[1]], "ro-")
+        plt.plot(
+            [start_loc[0] / 2, end_loc[0] / 2],
+            [start_loc[1] / 2, end_loc[1] / 2],
+            "ro-",
+        )
         plt.xlim(0, self.nx)
         plt.ylim(0, self.ny)
         ax.set_aspect("equal")
         rect = patches.Rectangle(
-            (self.buffer, self.buffer),
-            self.nx - (2 * self.buffer),
-            self.ny - (2 * self.buffer),
+            (self.buffer / 2, self.buffer / 2),
+            self.nx - (self.buffer),
+            self.ny - (self.buffer),
             linewidth=1,
             edgecolor="black",
             facecolor="none",
@@ -312,7 +321,7 @@ class QuicfireRun:
         sim.quic_fire.fuel_moisture_flag = 4
         sim.quic_fire.ignitions_per_cell = 5
         sim.quic_fire.auto_kill = 1
-        sim.qu_simparams.quic_domain_height = 1000
+        sim.qu_simparams.quic_domain_height = 1800
 
         # assemble ensemble
         self.qf_path.mkdir(exist_ok=True)
@@ -375,17 +384,6 @@ class QuicfireRun:
                 )
             )
         print("ignite.dat written to {}".format(self.qf_path))
-
-    def _copy_duet(self):
-        files = ["duet", "FIA_FastFuels_fin_fulllist_populated.txt"]
-        for file in files:
-            src = self.OG_PATH / "Duet" / file
-            dst = self.site_path / file
-            if not src.exists():
-                raise FileNotFoundError(
-                    "run_duet: {} not found in Duet directory".format(file)
-                )
-            copy(src, dst)
 
     def _import_fgrid_zarr(self):
         zarr_path = self.qf_path / self.mutable_name
