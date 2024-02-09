@@ -6,11 +6,10 @@ Created on Tue Oct 10 08:45:22 2023
 @author: ntutland
 """
 # Core imports
-from os import environ, chdir
+from os import environ
 from pathlib import Path
 import math
 from shutil import copy
-from time import sleep
 from datetime import datetime
 
 # External imports
@@ -41,32 +40,32 @@ def main():
         crs="EPSG:5070",
     )
     for i in range(len(fire_gdf.index)):
-        if i == 14:  # Caldor is already done
-            fire_name = fire_gdf.iloc[i]["Fire_Name"]
-            site_name = fire_gdf.iloc[i]["Site_Name"]
-            fire_date = fire_gdf.iloc[i]["Fire_Date"]
-            site_coords = fire_gdf.iloc[i]["geometry"]
-            domain_size = 500
-            og_path = HERE
+        fire_name = fire_gdf.iloc[i]["Fire_Name"]
+        site_name = fire_gdf.iloc[i]["Site_Name"]
+        fire_date = fire_gdf.iloc[i]["Fire_Date"]
+        site_coords = fire_gdf.iloc[i]["geometry"]
+        domain_size = 500
+        og_path = HERE
 
-            print("\n", fire_name, "-", site_name, "\n")
+        print("\n", fire_name, "-", site_name, "\n")
 
-            # prepare simulation
-            qf_run = QuicfireRun(
-                fire_name,
-                site_name,
-                fire_date,
-                site_coords,
-                domain_size,
-                og_path,
-            )
+        # prepare simulation
+        qf_run = QuicfireRun(
+            fire_name,
+            site_name,
+            fire_date,
+            site_coords,
+            domain_size,
+            og_path,
+        )
 
-            qf_run.create_burnplot()
-            qf_run.run_fastfuels()
-            qf_run.correct_fuelheight()
-            qf_run.get_ignition()
-            qf_run.draw_ignition()
-            qf_run.quicfire_simulation()
+        qf_run.create_burnplot()
+        qf_run.run_fastfuels()
+        qf_run.new_wdir_from_topo()
+        # qf_run.correct_fuelheight()
+        qf_run.get_ignition()
+        qf_run.draw_ignition()
+        qf_run.quicfire_simulation()
 
 
 class QuicfireRun:
@@ -224,6 +223,23 @@ class QuicfireRun:
         height[1:, :, :] = 1.0
         _write_array_to_dat(height, "treesfueldepth.dat", self.site_path, reshape=False)
 
+    def new_wdir_from_topo(self):
+        topo = _read_dat_file(
+            self.site_path,
+            "topo.dat",
+            arr_dim=(1, self.nx, self.ny),
+            order="C",
+        )
+        topo = topo[0, :, :]
+        lowpoint = np.where(topo == np.min(topo))
+        low_coords = (lowpoint[1][0], lowpoint[0][0])
+        center_coords = (self.nx / 2, self.ny / 2)
+        new_wdir = _calculate_angle(
+            low_coords[0], low_coords[1], center_coords[0], center_coords[1]
+        )
+        self.wind_dir = int(round(new_wdir))
+        plot_array(topo, f"{self.site_name} topo")
+
     def get_ignition(self):
         """
         Generate an ignition line based on wind direction that resides outside of
@@ -306,7 +322,7 @@ class QuicfireRun:
             fire_nz=self.nz,
             wind_speed=self.wind_speed,
             wind_direction=self.wind_dir,
-            simulation_time=3600,
+            simulation_time=7200,
         )
         sim.set_custom_simulation()
         sim.set_output_files(
@@ -380,7 +396,7 @@ class QuicfireRun:
             file.write("/\n")
             file.write(
                 "{} {} {} {} {} {}\n".format(
-                    start_loc[0], end_loc[0], start_loc[1], end_loc[1], 0, duration
+                    start_loc[0], start_loc[1], end_loc[0], end_loc[1], 0, duration
                 )
             )
         print("ignite.dat written to {}".format(self.qf_path))
@@ -523,6 +539,25 @@ def _pol2cart(rho, phi):
     x = -rho * np.sin(np.radians(phi))
     y = -rho * np.cos(np.radians(phi))
     return (x, y)
+
+
+def _calculate_angle(x1, y1, x2, y2):
+    dx = x2 - x1
+    dy = y2 - y1
+    angle_radians = math.atan2(dy, dx)
+    angle_degrees = math.degrees(angle_radians)
+    angle_degrees += 180
+    angle_degrees %= 360
+    return angle_degrees
+
+
+def plot_array(x, title):
+    plt.figure(2)
+    plt.set_cmap("viridis")
+    plt.imshow(x, origin="lower")
+    plt.colorbar()
+    plt.title(title, fontsize=18)
+    plt.show()
 
 
 if __name__ == "__main__":
