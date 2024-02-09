@@ -40,32 +40,33 @@ def main():
         crs="EPSG:5070",
     )
     for i in range(len(fire_gdf.index)):
-        fire_name = fire_gdf.iloc[i]["Fire_Name"]
-        site_name = fire_gdf.iloc[i]["Site_Name"]
-        fire_date = fire_gdf.iloc[i]["Fire_Date"]
-        site_coords = fire_gdf.iloc[i]["geometry"]
-        domain_size = 500
-        og_path = HERE
+        if i >= 2:
+            fire_name = fire_gdf.iloc[i]["Fire_Name"]
+            site_name = fire_gdf.iloc[i]["Site_Name"]
+            fire_date = fire_gdf.iloc[i]["Fire_Date"]
+            site_coords = fire_gdf.iloc[i]["geometry"]
+            domain_size = 500
+            og_path = HERE
 
-        print("\n", fire_name, "-", site_name, "\n")
+            print("\n", fire_name, "-", site_name, "\n")
 
-        # prepare simulation
-        qf_run = QuicfireRun(
-            fire_name,
-            site_name,
-            fire_date,
-            site_coords,
-            domain_size,
-            og_path,
-        )
+            # prepare simulation
+            qf_run = QuicfireRun(
+                fire_name,
+                site_name,
+                fire_date,
+                site_coords,
+                domain_size,
+                og_path,
+            )
 
-        qf_run.create_burnplot()
-        qf_run.run_fastfuels()
-        qf_run.new_wdir_from_topo()
-        # qf_run.correct_fuelheight()
-        qf_run.get_ignition()
-        qf_run.draw_ignition()
-        qf_run.quicfire_simulation()
+            qf_run.create_burnplot()
+            qf_run.run_fastfuels()
+            qf_run.new_wdir_from_topo()
+            # qf_run.correct_fuelheight()
+            qf_run.get_ignition()
+            qf_run.draw_ignition()
+            qf_run.quicfire_simulation()
 
 
 class QuicfireRun:
@@ -546,7 +547,14 @@ def _calculate_angle(x1, y1, x2, y2):
     dy = y2 - y1
     angle_radians = math.atan2(dy, dx)
     angle_degrees = math.degrees(angle_radians)
-    angle_degrees += 180
+    if (dx == 0 and dy < 0) or (dx < 0 and dy == 0):
+        angle_degrees += 180
+    elif dx == 0 and dy > 0:
+        angle_degrees += 90
+    elif dx > 0 and dy == 0:
+        angle_degrees -= 90
+    elif (dx >= 0 and dy >= 0) or (dx < 0 and dy < 0):
+        angle_degrees += 180
     angle_degrees %= 360
     return angle_degrees
 
