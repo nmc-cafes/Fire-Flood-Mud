@@ -43,6 +43,11 @@ pts_to_pol <- function(mtbs_pts){
 }
 
 #### ASSEMBLE DATASET ####
+fires <- c("KNP")
+sites <- c("KaweahMiddle")
+sizes <- c(500)
+outputs <- c("mass_burnt_pct","surface_consumption","canopy_consumption")
+
 
 first_fire <- T
 for(fire in fires){

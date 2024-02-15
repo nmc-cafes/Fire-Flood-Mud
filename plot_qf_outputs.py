@@ -19,12 +19,27 @@ runpath = Path(
 
 sim = SimulationOutputs(runpath / "Output", nz=65, ny=302, nx=302)
 print(sim.list_available_outputs())
-dens = sim.get_output("fuels-dens")
-dens_arr = dens.to_numpy()
-# plot_array(dens_arr[-1, 0, :, :], "final density")
 
 arrpath = runpath / "Arrays"
 arrpath.mkdir(exist_ok=True)
-surf_consumption = (dens_arr[0, 0, :, :] - dens_arr[-1, 0, :, :]) / dens_arr[0, 0, :, :]
-plot_array(surf_consumption, "surface consumption")
-np.savetxt(arrpath / "surface_consumption.txt", surf_consumption)
+
+# integrated percent mass burnt
+mburnt = sim.get_output("mburnt_integ")
+mburnt_arr = mburnt.to_numpy()
+mburnt_total = mburnt_arr[-1, 0, :, :]
+plot_array(mburnt_total, "percent mass burnt")
+np.savetxt(arrpath / "mass_burnt_pct.txt", mburnt_total)
+
+# surface consumption
+dens = sim.get_output("fuels-dens")
+dens_init = dens.to_numpy(timestep=0)
+dens_final = dens.to_numpy(len(dens.times) - 1)
+surface_consumption = dens_init[0, 0, :, :] - dens_final[0, 0, :, :]
+plot_array(surface_consumption, "surface fuel consumption")
+np.savetxt(arrpath / "surface_consumption.txt", surface_consumption)
+
+# canopy consumption
+canopy_consumption = np.sum(dens_init, axis=1) - np.sum(dens_final, axis=1)
+canopy_consumption = canopy_consumption[0, :, :]
+plot_array(canopy_consumption, "canopy fuel consumption")
+np.savetxt(arrpath / "canopy_consumption.txt", canopy_consumption)
