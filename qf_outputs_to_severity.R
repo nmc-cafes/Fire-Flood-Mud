@@ -46,7 +46,13 @@ pts_to_pol <- function(mtbs_pts){
 fires <- c("KNP")
 sites <- c("KaweahMiddle")
 sizes <- c(500)
-outputs <- c("mass_burnt_pct","surface_consumption","canopy_consumption")
+outputs <- c("mass_burnt_pct",
+             "surface_consumption",
+             "canopy_consumption",
+             "max_power",
+             "residence_time_power",
+             "residence_time_consumptions",
+             "max_reaction_rate")
 
 
 first_fire <- T
