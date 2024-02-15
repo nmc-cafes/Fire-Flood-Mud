@@ -21,4 +21,10 @@ sim = SimulationOutputs(runpath / "Output", nz=65, ny=302, nx=302)
 print(sim.list_available_outputs())
 dens = sim.get_output("fuels-dens")
 dens_arr = dens.to_numpy()
-plot_array(dens_arr[-1, 0, :, :], "final density")
+# plot_array(dens_arr[-1, 0, :, :], "final density")
+
+arrpath = runpath / "Arrays"
+arrpath.mkdir(exist_ok=True)
+surf_consumption = (dens_arr[0, 0, :, :] - dens_arr[-1, 0, :, :]) / dens_arr[0, 0, :, :]
+plot_array(surf_consumption, "surface consumption")
+np.savetxt(arrpath / "surface_consumption.txt", surf_consumption)
