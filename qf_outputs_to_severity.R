@@ -51,7 +51,7 @@ outputs <- c("mass_burnt_pct",
              "canopy_consumption",
              "max_power",
              "residence_time_power",
-             "residence_time_consumptions",
+             "residence_time_consumption",
              "max_reaction_rate")
 
 
@@ -59,6 +59,7 @@ first_fire <- T
 for(fire in fires){
   mtbs <- rast(here(fire,
                     paste0(fire,"_dNBR.tif")))
+  names(mtbs) <- "dNBR"
   first_site <- T
   for(site in sites){ #placeholder
     first_size <- T
@@ -68,7 +69,7 @@ for(fire in fires){
                                site,
                                paste0(size,"m"),
                                paste0(site,"_bounds_",size,"m.shp")))
-      mtbs_crop <- crop(mtbs, extplot_bounds)
+      mtbs_crop <- crop(mtbs, ext(plot_bounds))
       mtbs_pts <- as.points(mtbs_crop)
       mtbs_pol <- pts_to_pol(mtbs_pts)
       first_output <- T
@@ -80,7 +81,7 @@ for(fire in fires){
                                    paste0(output,".txt")))
         out_rst <- output_to_rst(output, out_arr, plot_bounds)
         out_crop <- crop(out_rst, ext_buff(out_rst))
-        if(first_run){
+        if(first_output){
           out_vect <- terra::extract(out_crop,
                                      mtbs_pol,
                                      fun=mean,
@@ -121,4 +122,4 @@ for(fire in fires){
 }
 
 all_data <- as_tibble(fire_vect)
-
+write.csv(all_data, here("all_data.csv"), row.names = F)
