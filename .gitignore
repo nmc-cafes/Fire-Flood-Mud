@@ -9,6 +9,8 @@
 !*.txt
 !*.csv
 !*.yml
+!*.code-workspace
+!*.Rproj
 
 # Descend into directories
 !Duet/
