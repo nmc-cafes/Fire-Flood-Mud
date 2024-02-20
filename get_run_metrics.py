@@ -14,14 +14,18 @@ def plot_array(x, title):
 
 
 runpath = Path(
-    "/Users/ntutland/Documents/Projects/Fire-Flood-Mud/QF_runs/KNP/KNP_KaweahMiddle_500m"
+    "/Users/ntutland/Documents/Projects/Fire-Flood-Mud/QF_runs/Caldor/Caldor_American_500m"
 )
 
 sim = SimulationOutputs(runpath / "Output", nz=65, ny=302, nx=302)
 print(sim.list_available_outputs())
 
+dens = sim.get_output("fuels-dens")
+dens_arr = dens.to_numpy(timestep=len(dens.times) - 1)
+plot_array(dens_arr[0, 0, :, :], "current fuel density")
+
 arrpath = runpath / "Arrays"
-arrpath.mkdir(exist_ok=True)
+# arrpath.mkdir(exist_ok=True)
 
 
 def get_mass_burnt(sim: SimulationOutputs):
@@ -119,4 +123,4 @@ def get_max_reaction_rate(sim: SimulationOutputs):
 # get_max_power(sim)
 # get_residence_time_from_power(sim)
 # get_residence_time_from_consumption(sim)
-get_max_reaction_rate(sim)
+# get_max_reaction_rate(sim)

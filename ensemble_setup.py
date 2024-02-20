@@ -40,7 +40,7 @@ def main():
         crs="EPSG:5070",
     )
     for i in range(len(fire_gdf.index)):
-        if i >= 2:
+        if i >= 9:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -113,7 +113,8 @@ class QuicfireRun:
         self.duet_done = duet_done
         self.severity_done = severity_done
         # Calculated
-        self.wind_dir, self.wind_speed = self._meteostat()
+        self.wind_dir = None
+        self.wind_speed = 10
         self.ignition_coords = None
         self.fgrid_zarr = self._import_fgrid_zarr() if fastfuels_done else None
         self.nx = self.fgrid_zarr.attrs["nx"] if fastfuels_done else None
@@ -431,7 +432,7 @@ class QuicfireRun:
         data = Daily(plot, start, end)
         data = data.fetch()
 
-        return (data.wdir[0], data.wspd[0])
+        return data.wspd[0]
 
     def _make_bbox(self, dim):
         dim = dim / 2
@@ -543,18 +544,10 @@ def _pol2cart(rho, phi):
 
 
 def _calculate_angle(x1, y1, x2, y2):
-    dx = x2 - x1
-    dy = y2 - y1
-    angle_radians = math.atan2(dy, dx)
+    dx = x1 - x2
+    dy = y1 - y2
+    angle_radians = math.atan2(dx, dy)
     angle_degrees = math.degrees(angle_radians)
-    if (dx == 0 and dy < 0) or (dx < 0 and dy == 0):
-        angle_degrees += 180
-    elif dx == 0 and dy > 0:
-        angle_degrees += 90
-    elif dx > 0 and dy == 0:
-        angle_degrees -= 90
-    elif (dx >= 0 and dy >= 0) or (dx < 0 and dy < 0):
-        angle_degrees += 180
     angle_degrees %= 360
     return angle_degrees
 
