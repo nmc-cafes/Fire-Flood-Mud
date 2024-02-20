@@ -1,0 +1,13 @@
+name: fire-flood-mud
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - zarr
+  - matplotlib
+  - rpy2
+  - r-essentials
+  - r
+prefix: /Users/ntutland/anaconda3/envs/fire-flood-mud
