@@ -19,7 +19,7 @@ def main():
     # Tracking Vars
     PATH_BUILT_SIMS = []
     PROCS = []
-    MAX_PARALLEL_SIMS = 30
+    MAX_PARALLEL_SIMS = 12
 
     for fire in PATH_FIRES:
         for sim in fire.iterdir():
@@ -42,7 +42,7 @@ def main():
         print("Running simulation: ", path2run)
         start_time = time.time()
         proc = subprocess.Popen(
-            ["wsl", "./quicfire_LIN64.exe"],
+            "./quicfire_LIN64.exe",
             cwd=CWD_SUBPROCESS,
             stdout=subprocess.PIPE,
             preexec_fn=os.setpgrp,
@@ -59,16 +59,6 @@ def remove_completed_processes(PROCS: list):
     time.sleep(60)
     for proc in PROCS:
         p = proc["proc"]
-        duration = (
-            time.time() - proc["start_time"]
-        )  # calculate how long the process has been running
-        if duration > 7200:  # if the process has been running for more than two hours
-            p.terminate()  # stop the process
-            working_directory = proc["path"]  # get the working directory
-            # save the working directory in a JSON file
-            with open("failed.json", "a") as f:
-                json.dump({p.pid: str(working_directory)}, f)
-                f.write("\n")  # write each entry on a new line
 
         # check if the process has finished
         try:

@@ -43,8 +43,7 @@ pts_to_pol <- function(mtbs_pts){
 }
 
 #### ASSEMBLE DATASET ####
-fires <- c("KNP")
-sites <- c("KaweahMiddle")
+fires <- c("Caldor","CedarCreek","CudbCreek2","Dixie","KNP")
 sizes <- c(500)
 outputs <- c("mass_burnt_pct",
              "surface_consumption",
@@ -60,6 +59,7 @@ for(fire in fires){
   mtbs <- rast(here(fire,
                     paste0(fire,"_dNBR.tif")))
   names(mtbs) <- "dNBR"
+  sites <- list.dirs(here(fire))
   first_site <- T
   for(site in sites){ #placeholder
     first_size <- T
