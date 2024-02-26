@@ -42,6 +42,7 @@ pts_to_pol <- function(mtbs_pts){
   return(mtbs_pol)
 }
 
+
 #### ASSEMBLE DATASET ####
 fires <- c("Caldor","CedarCreek","CubCreek2","Dixie","KNP")
 sizes <- c(500)
@@ -55,12 +56,17 @@ outputs <- c("mass_burnt_pct",
 
 
 first_fire <- T
+rm(out_vect,size_vect,site_vect,fire_vect)
 for(fire in fires){
   cat(fire,"\n")
   mtbs <- rast(here(fire,paste0(fire,"_dNBR.tif")))
   names(mtbs) <- "dNBR"
   severity <- rast(here(fire, paste0(fire,"_Severity.tif")))
   names(severity) <- "severity"
+  dem <- rast(here(fire, paste0(fire,"_DEM.tif")))
+  slope <- terrain(dem, v="slope", unit="degrees")
+  slope <- terra::project(slope,mtbs,method="bilinear")
+  names(slope) <- "slope"
   sites <- list.dirs(here("Arrays",fire), full.names = F, recursive = F)
   for(i in 1:length(sites)){
     sites[i] <- str_split(sites[i], "_")[[1]][2]
@@ -79,7 +85,8 @@ for(fire in fires){
       mtbs_crop <- crop(mtbs, ext(plot_bounds))
       mtbs_pts <- as.points(mtbs_crop)
       sev_pts <- terra::extract(severity, mtbs_pts, bind=T, ID=F)
-      sev_pol <- pts_to_pol(sev_pts)
+      site_pts <- terra::extract(slope, sev_pts, bind=T, ID=F)
+      site_pol <- pts_to_pol(site_pts)
       first_output <- T
       for(output in outputs){
         cat("\t",output,"\n")
@@ -92,7 +99,7 @@ for(fire in fires){
         out_crop <- crop(out_rst, ext_buff(out_rst))
         if(first_output){
           out_vect <- terra::extract(out_crop,
-                                     sev_pol,
+                                     site_pol,
                                      fun=mean,
                                      na.rm=T,
                                      bind=T)
