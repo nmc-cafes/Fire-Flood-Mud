@@ -8,7 +8,8 @@ dat <- read.csv(here("all_data.csv")) %>%
   mutate(severity = case_when(severity==1 ~ "unburned",
                               severity==2 ~ "low",
                               severity==3 ~ "moderate",
-                              severity==4 ~ "high"))
+                              severity==4 ~ "high"),
+         canopy_consumption = canopy_consumption - surface_consumption)
 
 # explore!
 
