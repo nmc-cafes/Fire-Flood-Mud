@@ -14,9 +14,7 @@ def plot_array(x, title):
     plt.show()
 
 
-runs_dir = Path(
-    "/Users/ntutland/Documents/Projects/Fire-Flood-Mud/QF_runs/"
-)
+runs_dir = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud/QF_runs/")
 
 
 def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -42,7 +40,9 @@ def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = T
     dens = sim.get_output("fuels-dens")
     dens_init = dens.to_numpy(timestep=0)
     dens_final = dens.to_numpy(len(dens.times) - 1)
-    canopy_consumption = np.sum(dens_init, axis=1) - np.sum(dens_final, axis=1)
+    canopy_consumption = np.sum(dens_init[:, 1:, :, :], axis=1) - np.sum(
+        dens_final[:, 1:, :, :], axis=1
+    )
     canopy_consumption = canopy_consumption[0, :, :]
     if plot:
         plot_array(canopy_consumption, "canopy fuel consumption")
@@ -63,7 +63,9 @@ def get_max_power(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     np.savetxt(arrpath / "max_power.txt", max_power)
 
 
-def get_residence_time_from_power(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
+def get_residence_time_from_power(
+    sim: SimulationOutputs, arrpath: Path, plot: bool = True
+):
     energy = sim.get_output("surfEnergy")
     initial = energy.to_numpy(timestep=0)
     prev = initial[0, 0, :, :]
@@ -78,7 +80,9 @@ def get_residence_time_from_power(sim: SimulationOutputs, arrpath: Path, plot: b
     np.savetxt(arrpath / "residence_time_power.txt", residence_time)
 
 
-def get_residence_time_from_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
+def get_residence_time_from_consumption(
+    sim: SimulationOutputs, arrpath: Path, plot: bool = True
+):
     dens = sim.get_output("fuels-dens")
     add_to = np.zeros((sim.ny, sim.nx))
     for t in range(1, len(dens.times)):
@@ -114,14 +118,15 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
         plot_array(max_react, "max reaction rate")
     np.savetxt(arrpath / "max_reaction_rate.txt", max_react)
 
-fires = ["Caldor","CedarCreek","CubCreek2","Dixie","KNP"]
+
+fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 for fire in fires:
     fire_dir = runs_dir / fire
     sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
     for site in sites:
         print(site)
         runpath = fire_dir / site
-        quic_fire = QUIC_fire.from_file(runpath, version = 'latest')
+        quic_fire = QUIC_fire.from_file(runpath, version="latest")
         nz = quic_fire.nz
         sim_outputs = SimulationOutputs(runpath / "Output", nz=nz, ny=302, nx=302)
         # print(sim_outputs.list_available_outputs())

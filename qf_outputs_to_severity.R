@@ -42,8 +42,9 @@ pts_to_pol <- function(mtbs_pts){
   return(mtbs_pol)
 }
 
+
 #### ASSEMBLE DATASET ####
-fires <- c("Caldor","CedarCreek","CudbCreek2","Dixie","KNP")
+fires <- c("Caldor","CedarCreek","CubCreek2","Dixie","KNP")
 sizes <- c(500)
 outputs <- c("mass_burnt_pct",
              "surface_consumption",
@@ -55,15 +56,27 @@ outputs <- c("mass_burnt_pct",
 
 
 first_fire <- T
+rm(out_vect,size_vect,site_vect,fire_vect)
 for(fire in fires){
-  mtbs <- rast(here(fire,
-                    paste0(fire,"_dNBR.tif")))
+  cat(fire,"\n")
+  mtbs <- rast(here(fire,paste0(fire,"_dNBR.tif")))
   names(mtbs) <- "dNBR"
-  sites <- list.dirs(here(fire))
+  severity <- rast(here(fire, paste0(fire,"_Severity.tif")))
+  names(severity) <- "severity"
+  dem <- rast(here(fire, paste0(fire,"_DEM.tif")))
+  slope <- terrain(dem, v="slope", unit="degrees")
+  slope <- terra::project(slope,mtbs,method="bilinear")
+  names(slope) <- "slope"
+  sites <- list.dirs(here("Arrays",fire), full.names = F, recursive = F)
+  for(i in 1:length(sites)){
+    sites[i] <- str_split(sites[i], "_")[[1]][2]
+  }
   first_site <- T
-  for(site in sites){ #placeholder
+  for(site in sites){
+    cat(site,"\n")
     first_size <- T
     for(size in sizes){
+      cat(size,"\n")
       plot_bounds <- vect(here(fire,
                                "Sample_Sites",
                                site,
@@ -71,10 +84,13 @@ for(fire in fires){
                                paste0(site,"_bounds_",size,"m.shp")))
       mtbs_crop <- crop(mtbs, ext(plot_bounds))
       mtbs_pts <- as.points(mtbs_crop)
-      mtbs_pol <- pts_to_pol(mtbs_pts)
+      sev_pts <- terra::extract(severity, mtbs_pts, bind=T, ID=F)
+      site_pts <- terra::extract(slope, sev_pts, bind=T, ID=F)
+      site_pol <- pts_to_pol(site_pts)
       first_output <- T
       for(output in outputs){
-        out_arr <- read.table(here("QF_runs",
+        cat("\t",output,"\n")
+        out_arr <- read.table(here("Arrays",
                                    fire, 
                                    paste0(fire,"_",site,"_",size,"m"),
                                    "Arrays",
@@ -83,7 +99,7 @@ for(fire in fires){
         out_crop <- crop(out_rst, ext_buff(out_rst))
         if(first_output){
           out_vect <- terra::extract(out_crop,
-                                     mtbs_pol,
+                                     site_pol,
                                      fun=mean,
                                      na.rm=T,
                                      bind=T)
@@ -96,27 +112,27 @@ for(fire in fires){
         }
         first_output <- F
       }
-      out_vect$size = size
+      out_vect$size <- size
+      out_vect$site <- site
+      out_vect$fire <- fire
       if(first_size){
         size_vect <- out_vect
       } else{
-        size_vect <- bind_rows(size_vect, out_vect)
+        size_vect <- bind_spat_rows(size_vect, out_vect)
       }
       first_size <- F
     }
-    size_vect$site = site
     if(first_site){
       site_vect <- size_vect
     } else{
-      site_vect <- bind_rows(site_vect,size_vect)
+      site_vect <- bind_spat_rows(site_vect,size_vect)
     }
     first_site <- F
   }
-  site_vect$fire <- fire
   if(first_fire){
     fire_vect <- site_vect
   } else{
-    fire_vect <- bind_rows(fire_vect, site_vect)
+    fire_vect <- bind_spat_rows(fire_vect, site_vect)
   }
   first_fire <- F
 }
