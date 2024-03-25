@@ -40,7 +40,7 @@ def main():
         crs="EPSG:5070",
     )
     for i in range(len(fire_gdf.index)):
-        if i >= 9:
+        if i >= 0:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -58,8 +58,8 @@ def main():
                 site_coords,
                 domain_size,
                 og_path,
+                fastfuels_done=True,
             )
-
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
             qf_run.new_wdir_from_topo()
@@ -404,7 +404,7 @@ class QuicfireRun:
         print("ignite.dat written to {}".format(self.qf_path))
 
     def _import_fgrid_zarr(self):
-        zarr_path = self.qf_path / self.mutable_name
+        zarr_path = self.site_path / self.mutable_name
         zroot = zarr.open(zarr_path, mode="r")
         return zroot
 

@@ -3,6 +3,7 @@ from quicfire_tools import SimulationOutputs
 from quicfire_tools.inputs import QUIC_fire
 import matplotlib.pyplot as plt
 from pathlib import Path
+from scipy.io import FortranFile
 
 
 def plot_array(x, title):
@@ -119,36 +120,57 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
     np.savetxt(arrpath / "max_reaction_rate.txt", max_react)
 
 
-fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
-for fire in fires:
-    fire_dir = runs_dir / fire
-    sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
-    for site in sites:
-        print(site)
-        runpath = fire_dir / site
-        quic_fire = QUIC_fire.from_file(runpath, version="latest")
-        nz = quic_fire.nz
-        sim_outputs = SimulationOutputs(runpath / "Output", nz=nz, ny=302, nx=302)
-        # print(sim_outputs.list_available_outputs())
+def _read_dat_file(
+    dire: Path, filename: str, arr_dim: tuple, order: str = "C"
+) -> np.array:
+    """
+    Read in a .dat file as a numpy array.
 
-        # dens = sim_outputs.get_output("fuels-dens")
-        # dens_arr = dens.to_numpy(timestep=len(dens.times) - 1)
-        # plot_array(dens_arr[0, 0, :, :], "current fuel density")
+    Dimensions of the array must be known, and in the order (z,y,x)
+    """
 
-        arrpath = runpath / "Arrays"
-        arrpath.mkdir(exist_ok=True)
+    # Import and reshape .dat file
+    path = dire / filename
+    with open(path, "rb") as fin:
+        arr = FortranFile(fin).read_reals(dtype="float32").reshape(arr_dim, order=order)
 
-        print("\t- getting mass burnt")
-        get_mass_burnt(sim_outputs, arrpath, False)
-        print("\t- getting surface consumption")
-        get_surface_consumption(sim_outputs, arrpath, False)
-        print("\t- getting canopy consumption")
-        get_canopy_consumption(sim_outputs, arrpath, False)
-        print("\t- getting max power")
-        get_max_power(sim_outputs, arrpath, False)
-        print("\t- getting residence time from power")
-        get_residence_time_from_power(sim_outputs, arrpath, False)
-        print("\t- getting residence time from consumption")
-        get_residence_time_from_consumption(sim_outputs, arrpath, False)
-        print("\t- getting max reaction rate")
-        get_max_reaction_rate(sim_outputs, arrpath, False)
+    return arr
+
+
+runpath = runs_dir / "Caldor" / "Caldor_Camp1_500m"
+dens_arr = _read_dat_file(runpath, "treesrhof.dat", (80, 302, 302))
+plot_array(dens_arr[0, :, :], "Surface Fuel Bulk Density (kg/m^3)")
+
+# fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+# for fire in fires:
+#     fire_dir = runs_dir / fire
+#     sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
+#     for site in sites:
+#         print(site)
+#         runpath = fire_dir / site
+#         quic_fire = QUIC_fire.from_file(runpath, version="latest")
+#         nz = quic_fire.nz
+#         sim_outputs = SimulationOutputs(runpath / "Output", nz=nz, ny=302, nx=302)
+#         # print(sim_outputs.list_available_outputs())
+
+#         # dens = sim_outputs.get_output("fuels-dens")
+#         # dens_arr = dens.to_numpy(timestep=len(dens.times) - 1)
+#         # plot_array(dens_arr[0, 0, :, :], "current fuel density")
+
+#         arrpath = runpath / "Arrays"
+#         arrpath.mkdir(exist_ok=True)
+
+#         print("\t- getting mass burnt")
+#         get_mass_burnt(sim_outputs, arrpath, False)
+#         print("\t- getting surface consumption")
+#         get_surface_consumption(sim_outputs, arrpath, False)
+#         print("\t- getting canopy consumption")
+#         get_canopy_consumption(sim_outputs, arrpath, False)
+#         print("\t- getting max power")
+#         get_max_power(sim_outputs, arrpath, False)
+#         print("\t- getting residence time from power")
+#         get_residence_time_from_power(sim_outputs, arrpath, False)
+#         print("\t- getting residence time from consumption")
+#         get_residence_time_from_consumption(sim_outputs, arrpath, False)
+#         print("\t- getting max reaction rate")
+#         get_max_reaction_rate(sim_outputs, arrpath, False)
