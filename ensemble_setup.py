@@ -28,6 +28,7 @@ from scipy.io import FortranFile
 environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
 import fastfuels_sdk as fastfuels
 import quicfire_tools as qft
+import duet_tools as duet
 
 
 def main():
@@ -225,6 +226,33 @@ class QuicfireRun:
         height[1:, :, :] = 1.0
         _write_array_to_dat(height, "treesfueldepth.dat", self.site_path, reshape=False)
 
+    def run_duet(self):
+        if self.duet_done == False:
+            self._copy_duet()
+            required = ["duet", "duet.in", "FIA_FastFuels_fin_fulllist_populated.txt"]
+            for file in required:
+                test_path = self.site_path / file
+                if not test_path.exists():
+                    raise FileNotFoundError("run_duet: {} not found".format(file))
+            # run DUET
+            chdir(self.site_path)
+            with subprocess.Popen(["./duet"], stdout=subprocess.PIPE) as process:
+
+                def poll_and_read():
+                    print(f"{process.stdout.read1().decode('utf-8')}")
+
+                while process.poll() != 0:
+                    poll_and_read()
+                    sleep(1)
+                if process.poll() == 0:
+                    print("DUET run successfully")
+            chdir(self.OG_PATH)
+            self._calibrate_duet()
+        else:
+            print(
+                "DUET has already been run and calibrated. To rerun, set self.duet_done to False"
+            )
+
     def new_wdir_from_topo(self):
         topo = _read_dat_file(
             self.site_path,
@@ -402,6 +430,17 @@ class QuicfireRun:
                 )
             )
         print("ignite.dat written to {}".format(self.qf_path))
+
+    def _copy_duet(self):
+        files = ["duet", "FIA_FastFuels_fin_fulllist_populated.txt"]
+        for file in files:
+            src = self.OG_PATH / "Duet" / file
+            dst = self.site_path / file
+            if not src.exists():
+                raise FileNotFoundError(
+                    "run_duet: {} not found in Duet directory".format(file)
+                )
+            copy(src, dst)
 
     def _import_fgrid_zarr(self):
         zarr_path = self.site_path / self.mutable_name
