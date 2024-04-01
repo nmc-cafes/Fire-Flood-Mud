@@ -4,6 +4,7 @@ from quicfire_tools.inputs import QUIC_fire
 import matplotlib.pyplot as plt
 from pathlib import Path
 from scipy.io import FortranFile
+import pandas as pd
 
 
 def plot_array(x, title):
@@ -25,6 +26,7 @@ def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     if plot:
         plot_array(mburnt_total, "percent mass burnt")
     np.savetxt(arrpath / "mass_burnt_pct.txt", mburnt_total)
+    return mburnt_total
 
 
 def get_surface_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -35,6 +37,7 @@ def get_surface_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = 
     if plot:
         plot_array(surface_consumption, "surface fuel consumption")
     np.savetxt(arrpath / "surface_consumption.txt", surface_consumption)
+    return surface_consumption
 
 
 def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -48,6 +51,7 @@ def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = T
     if plot:
         plot_array(canopy_consumption, "canopy fuel consumption")
     np.savetxt(arrpath / "canopy_consumption.txt", canopy_consumption)
+    return canopy_consumption
 
 
 def get_max_power(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -62,6 +66,7 @@ def get_max_power(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     if plot:
         plot_array(max_power, "max power")
     np.savetxt(arrpath / "max_power.txt", max_power)
+    return max_power
 
 
 def get_residence_time_from_power(
@@ -79,6 +84,7 @@ def get_residence_time_from_power(
     if plot:
         plot_array(residence_time, "residence time from power")
     np.savetxt(arrpath / "residence_time_power.txt", residence_time)
+    return residence_time
 
 
 def get_residence_time_from_consumption(
@@ -102,6 +108,7 @@ def get_residence_time_from_consumption(
     if plot:
         plot_array(residence_time, "residence time from consumption")
     np.savetxt(arrpath / "residence_time_consumption.txt", residence_time)
+    return residence_time
 
 
 def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -118,6 +125,7 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
     if plot:
         plot_array(max_react, "max reaction rate")
     np.savetxt(arrpath / "max_reaction_rate.txt", max_react)
+    return max_react
 
 
 def _read_dat_file(
@@ -137,40 +145,53 @@ def _read_dat_file(
     return arr
 
 
-runpath = runs_dir / "Caldor" / "Caldor_Camp1_500m"
-dens_arr = _read_dat_file(runpath, "treesrhof.dat", (80, 302, 302))
-plot_array(dens_arr[0, :, :], "Surface Fuel Bulk Density (kg/m^3)")
+all_data = pd.DataFrame()
+fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+for fire in ["Caldor"]:
+    fire_dir = runs_dir / fire
+    sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
+    for site in ["Caldor_Camp2_500m", "Caldor_Camp2_500m_duet"]:
+        print(site)
+        runpath = fire_dir / site
+        quic_fire = QUIC_fire.from_file(runpath, version="latest")
+        nz = quic_fire.nz
+        sim_outputs = SimulationOutputs(runpath / "Output", nz=nz, ny=302, nx=302)
+        # print(sim_outputs.list_available_outputs())
 
-# fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
-# for fire in fires:
-#     fire_dir = runs_dir / fire
-#     sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
-#     for site in sites:
-#         print(site)
-#         runpath = fire_dir / site
-#         quic_fire = QUIC_fire.from_file(runpath, version="latest")
-#         nz = quic_fire.nz
-#         sim_outputs = SimulationOutputs(runpath / "Output", nz=nz, ny=302, nx=302)
-#         # print(sim_outputs.list_available_outputs())
+        dens = sim_outputs.get_output("fuels-dens")
+        dens_arr = dens.to_numpy(timestep=len(dens.times) - 1)
+        plot_array(dens_arr[0, 0, :, :], "current fuel density")
 
-#         # dens = sim_outputs.get_output("fuels-dens")
-#         # dens_arr = dens.to_numpy(timestep=len(dens.times) - 1)
-#         # plot_array(dens_arr[0, 0, :, :], "current fuel density")
+        arrpath = runpath / "Arrays"
+        arrpath.mkdir(exist_ok=True)
 
-#         arrpath = runpath / "Arrays"
-#         arrpath.mkdir(exist_ok=True)
+        print("\t- getting mass burnt")
+        mburnt = get_mass_burnt(sim_outputs, arrpath, True)
+        print("\t- getting surface consumption")
+        surf_cons = get_surface_consumption(sim_outputs, arrpath, True)
+        print("\t- getting canopy consumption")
+        canopy_cons = get_canopy_consumption(sim_outputs, arrpath, True)
+        print("\t- getting max power")
+        max_power = get_max_power(sim_outputs, arrpath, True)
+        print("\t- getting residence time from power")
+        res_power = get_residence_time_from_power(sim_outputs, arrpath, True)
+        print("\t- getting residence time from consumption")
+        res_cons = get_residence_time_from_consumption(sim_outputs, arrpath, True)
+        print("\t- getting max reaction rate")
+        max_react = get_max_reaction_rate(sim_outputs, arrpath, True)
 
-#         print("\t- getting mass burnt")
-#         get_mass_burnt(sim_outputs, arrpath, False)
-#         print("\t- getting surface consumption")
-#         get_surface_consumption(sim_outputs, arrpath, False)
-#         print("\t- getting canopy consumption")
-#         get_canopy_consumption(sim_outputs, arrpath, False)
-#         print("\t- getting max power")
-#         get_max_power(sim_outputs, arrpath, False)
-#         print("\t- getting residence time from power")
-#         get_residence_time_from_power(sim_outputs, arrpath, False)
-#         print("\t- getting residence time from consumption")
-#         get_residence_time_from_consumption(sim_outputs, arrpath, False)
-#         print("\t- getting max reaction rate")
-#         get_max_reaction_rate(sim_outputs, arrpath, False)
+        d = {
+            "mass_burnt_pct": list(mburnt.flatten()),
+            "surface_consumption": list(surf_cons.flatten()),
+            "canopy_consumption": list(canopy_cons.flatten()),
+            "max_power": list(max_power.flatten()),
+            "residence_time_from_power": list(res_power.flatten()),
+            "residence_time_from_consumption": list(res_cons.flatten()),
+            "max_reaction_rate": list(max_react.flatten()),
+        }
+        option = "duet" if site == "Caldor_Camp2_500m_duet" else "no_duet"
+        df = pd.DataFrame(d)
+        df["option"] = option
+        all_data = pd.concat([all_data, df])
+
+all_data.to_csv(Path(__file__).parent / "duet_compare_Camp2.csv")
