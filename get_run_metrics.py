@@ -30,9 +30,11 @@ def get_surface_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = 
     dens = sim.get_output("fuels-dens")
     dens_init = dens.to_numpy(timestep=0)
     dens_final = dens.to_numpy(len(dens.times) - 1)
-    surface_consumption = dens_init[0, 0, :, :] - dens_final[0, 0, :, :]
+    surface_consumption = (dens_init[0, 0, :, :] - dens_final[0, 0, :, :]) / dens_init[
+        0, 0, :, :
+    ]
     if plot:
-        plot_array(surface_consumption, "surface fuel consumption")
+        plot_array(surface_consumption, "surface fuel consumption percent")
     np.savetxt(arrpath / "surface_consumption.txt", surface_consumption)
 
 
@@ -40,9 +42,9 @@ def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = T
     dens = sim.get_output("fuels-dens")
     dens_init = dens.to_numpy(timestep=0)
     dens_final = dens.to_numpy(len(dens.times) - 1)
-    canopy_consumption = np.sum(dens_init[:, 1:, :, :], axis=1) - np.sum(
-        dens_final[:, 1:, :, :], axis=1
-    )
+    canopy_consumption = (
+        np.sum(dens_init[:, 1:, :, :], axis=1) - np.sum(dens_final[:, 1:, :, :], axis=1)
+    ) / np.sum(dens_init[:, 1:, :, :], axis=1)
     canopy_consumption = canopy_consumption[0, :, :]
     if plot:
         plot_array(canopy_consumption, "canopy fuel consumption")
