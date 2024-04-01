@@ -61,7 +61,7 @@ def main():
             )
 
             qf_run.create_burnplot()
-            qf_run.run_fastfuels()
+            # qf_run.run_fastfuels()
             qf_run.new_wdir_from_topo()
             # qf_run.correct_fuelheight()
             qf_run.get_ignition()
