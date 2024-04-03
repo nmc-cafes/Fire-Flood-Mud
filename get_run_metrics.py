@@ -51,13 +51,18 @@ def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = T
     canopy_init = np.sum(dens_init, axis=0)
     canopy_final = np.sum(dens_final, axis=0)
     fuel_present = np.where(canopy_init > 0)
-    no_fuel = np.where(canopy_init == 0)
     canopy_consumption = np.zeros(np.shape(canopy_init))
+    fuels_present = np.zeros(np.shape(canopy_init))
+    fuels_present[fuel_present] = 1
     canopy_consumption[fuel_present] = (
         canopy_init[fuel_present] - canopy_final[fuel_present]
     ) / canopy_init[fuel_present]
-    canopy_consumption[no_fuel] = np.nan
     if plot:
+        print(np.sum(canopy_init))
+        print(np.sum(canopy_final))
+        print(np.sum(canopy_init) - np.sum(canopy_final))
+        print((np.sum(canopy_init) - np.sum(canopy_final)) / np.sum(canopy_init))
+        plot_array(canopy_init, "initial fuels")
         plot_array(canopy_consumption, "canopy fuel consumption")
     np.savetxt(arrpath / "canopy_consumption.txt", canopy_consumption)
 
@@ -151,17 +156,17 @@ for fire in fires:
         arrpath = runpath / "Arrays"
         arrpath.mkdir(exist_ok=True)
 
-        print("\t- getting mass burnt")
-        get_mass_burnt(sim_outputs, arrpath, False)
-        print("\t- getting surface consumption")
-        get_surface_consumption(sim_outputs, arrpath, False)
+        # print("\t- getting mass burnt")
+        # get_mass_burnt(sim_outputs, arrpath, False)
+        # print("\t- getting surface consumption")
+        # get_surface_consumption(sim_outputs, arrpath, False)
         print("\t- getting canopy consumption")
-        get_canopy_consumption(sim_outputs, arrpath, False)
-        print("\t- getting max power")
-        get_max_power(sim_outputs, arrpath, False)
-        print("\t- getting residence time from power")
-        get_residence_time_from_power(sim_outputs, arrpath, False)
-        print("\t- getting residence time from consumption")
-        get_residence_time_from_consumption(sim_outputs, arrpath, False)
-        print("\t- getting max reaction rate")
-        get_max_reaction_rate(sim_outputs, arrpath, False)
+        get_canopy_consumption(sim_outputs, arrpath, True)
+        # print("\t- getting max power")
+        # get_max_power(sim_outputs, arrpath, False)
+        # print("\t- getting residence time from power")
+        # get_residence_time_from_power(sim_outputs, arrpath, False)
+        # print("\t- getting residence time from consumption")
+        # get_residence_time_from_consumption(sim_outputs, arrpath, False)
+        # print("\t- getting max reaction rate")
+        # get_max_reaction_rate(sim_outputs, arrpath, False)
