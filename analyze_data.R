@@ -18,8 +18,8 @@ dat_site <- dat %>%
   summarize(dNBR = mean(dNBR),
             high_sev_pct = mean(severity%in%c("moderate","high")*100),
             mass_burnt_pct = mean(mass_burnt_pct),
-            surface_consumption = sum(surface_consumption),
-            canopy_consumption = sum(canopy_consumption),
+            surface_consumption = mean(surface_consumption,na.rm=T)*100,
+            canopy_consumption = mean(canopy_consumption,na.rm=T)*100,
             max_power = mean(max_power),
             residence_time_power = mean(residence_time_power),
             residence_time_consumption = mean(residence_time_consumption))
@@ -36,6 +36,17 @@ mburnt_site <- dat_site %>%
   theme(legend.position = "none")
 
 ggsave(here("Plots","mburnt_by_site.jpg"), mburnt_site, height = 12, width = 18, units = "cm")
+
+canopy_cons_site <- dat_site %>%
+  ggplot() +
+  geom_bar(stat = "identity", aes(site,canopy_consumption,fill=fire)) +
+  facet_wrap(.~fire, scales = "free_y") +
+  scale_fill_colorblind()+
+  labs(x="",
+       y="Canopy Consumption (%)") +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "none")
 
 sites_with_fire <- dat_site %>% filter(mass_burnt_pct > 20) %>% pull(site)
 
