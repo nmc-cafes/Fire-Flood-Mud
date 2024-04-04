@@ -39,9 +39,14 @@ def main():
         geometry=gpd.points_from_xy(fire_df["X"], fire_df["Y"]),
         crs="EPSG:5070",
     )
-    windspeeds = [4, 6, 8]
+
+    low = [0.5, 0.15, 0.5]
+    med = [0.75, 0.1, 0.75]
+    high = [1.0, 0.05, 1.0]
+    margins = {"low": low, "med": med, "high": high}
+
     for i in range(len(fire_gdf.index)):
-        if i >= 0:
+        if i == 21:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -49,10 +54,10 @@ def main():
             domain_size = 500
             og_path = HERE
 
-            for windspeed in windspeeds:
-                print("\n", fire_name, "-", site_name, "\n")
-
+            print("\n", fire_name, "-", site_name, "\n")
+            for margins, conditions in margins.items():
                 # prepare simulation
+                ff_done = False if margins == "low" else True
                 qf_run = QuicfireRun(
                     fire_name,
                     site_name,
@@ -60,11 +65,14 @@ def main():
                     site_coords,
                     domain_size,
                     og_path,
-                    windspeed,
+                    margins,
+                    conditions,
+                    fastfuels_done=ff_done,
                 )
 
                 qf_run.create_burnplot()
-                # qf_run.run_fastfuels()
+                qf_run.run_fastfuels()
+                qf_run.modify_margins()
                 qf_run.new_wdir_from_topo()
                 # qf_run.correct_fuelheight()
                 qf_run.get_ignition()
@@ -82,7 +90,8 @@ class QuicfireRun:
         site_coords,
         domain_size,
         og_path,
-        wind_speed,
+        margins,
+        conditions,
         EPSG=5070,
         buffer=50,
         burnplot_done=False,
@@ -99,10 +108,12 @@ class QuicfireRun:
         self.domain_size = domain_size
         self.EPSG = EPSG
         self.buffer = buffer
+        self.margins = margins
+        self.conditions = conditions
         self.ignition_pace = 5
         # Paths
         self.fire_path = OG_PATH / fire_name
-        qf_name = "_".join([fire_name, site_name, str(wind_speed) + "mps"])
+        qf_name = "_".join([fire_name, site_name, margins])
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
         self.site_path = (
             OG_PATH / fire_name / "Sample_Sites" / site_name / (str(domain_size) + "m")
@@ -119,7 +130,7 @@ class QuicfireRun:
         self.severity_done = severity_done
         # Calculated
         self.wind_dir = None
-        self.wind_speed = wind_speed
+        self.wind_speed = 10
         self.ignition_coords = None
         self.fgrid_zarr = self._import_fgrid_zarr() if fastfuels_done else None
         self.nx = self.fgrid_zarr.attrs["nx"] if fastfuels_done else None
@@ -220,6 +231,30 @@ class QuicfireRun:
             print(
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
             )
+
+    def modify_margins(self):
+        margins = _get_margin_indices((self.ny, self.nx), 25)
+        rhof = _read_dat_file(
+            self.site_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
+        )
+        height = _read_dat_file(
+            self.site_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
+        )
+        moist = _read_dat_file(
+            self.site_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
+        )
+
+        rhof[0, :, :][margins] = self.conditions[0]
+        moist[0, :, :][margins] = self.conditions[1]
+        height[0, :, :][margins] = self.conditions[2]
+
+        plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
+        plot_array(moist[0, :, :], f"modified moisture {self.margins}")
+        plot_array(height[0, :, :], f"modified height {self.margins}")
+
+        _write_array_to_dat(rhof, "treesrhof.dat", self.site_path, reshape=False)
+        _write_array_to_dat(moist, "treesmoist.dat", self.site_path, reshape=False)
+        _write_array_to_dat(height, "treesfueldepth.dat", self.site_path, reshape=False)
 
     def correct_fuelheight(self):
         """Corrects the treesfueldepth.dat file by filling all non-surface layers with 1's"""
@@ -479,7 +514,7 @@ class QuicfireRun:
 
 def _read_dat_file(
     dire: Path, filename: str, arr_dim: tuple, order: str = "C"
-) -> np.array:
+) -> np.ndarray:
     """
     Read in a .dat file as a numpy array.
 
@@ -555,6 +590,27 @@ def _calculate_angle(x1, y1, x2, y2):
     angle_degrees = math.degrees(angle_radians)
     angle_degrees %= 360
     return angle_degrees
+
+
+def _get_margin_indices(array_size, margin_width):
+
+    # Generate row and column indices for the array
+    rows, cols = np.indices(array_size)
+
+    # Create margins directly using np.logical_or to identify margins
+    margins = np.logical_or.reduce(
+        (
+            rows < margin_width,
+            rows >= array_size[0] - margin_width,
+            cols < margin_width,
+            cols >= array_size[1] - margin_width,
+        )
+    )
+
+    # Find the indices of the margins using np.where()
+    result_margins = np.where(margins)
+
+    return result_margins
 
 
 def plot_array(x, title):
