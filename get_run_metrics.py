@@ -137,10 +137,17 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
     np.savetxt(arrpath / "max_reaction_rate.txt", max_react)
 
 
-fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+# fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+fires = ["CubCreek2"]
 for fire in fires:
     fire_dir = runs_dir / fire
-    sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
+    # sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
+    sites = [
+        "CubCreek2_Chewuch_4mps",
+        "CubCreek2_Chewuch_6mps",
+        "CubCreek2_Chewuch_8mps",
+        "CubCreek2_Chewuch_500m",
+    ]
     for site in sites:
         print(site)
         runpath = fire_dir / site
