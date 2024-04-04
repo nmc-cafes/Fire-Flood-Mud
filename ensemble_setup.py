@@ -39,8 +39,9 @@ def main():
         geometry=gpd.points_from_xy(fire_df["X"], fire_df["Y"]),
         crs="EPSG:5070",
     )
+    windspeeds = [4, 6, 8]
     for i in range(len(fire_gdf.index)):
-        if i >= 9:
+        if i >= 0:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -48,28 +49,31 @@ def main():
             domain_size = 500
             og_path = HERE
 
-            print("\n", fire_name, "-", site_name, "\n")
+            for windspeed in windspeeds:
+                print("\n", fire_name, "-", site_name, "\n")
 
-            # prepare simulation
-            qf_run = QuicfireRun(
-                fire_name,
-                site_name,
-                fire_date,
-                site_coords,
-                domain_size,
-                og_path,
-            )
+                # prepare simulation
+                qf_run = QuicfireRun(
+                    fire_name,
+                    site_name,
+                    fire_date,
+                    site_coords,
+                    domain_size,
+                    og_path,
+                    windspeed,
+                )
 
-            qf_run.create_burnplot()
-            # qf_run.run_fastfuels()
-            qf_run.new_wdir_from_topo()
-            # qf_run.correct_fuelheight()
-            qf_run.get_ignition()
-            qf_run.draw_ignition()
-            qf_run.quicfire_simulation()
+                qf_run.create_burnplot()
+                # qf_run.run_fastfuels()
+                qf_run.new_wdir_from_topo()
+                # qf_run.correct_fuelheight()
+                qf_run.get_ignition()
+                # qf_run.draw_ignition()
+                qf_run.quicfire_simulation()
 
 
 class QuicfireRun:
+
     def __init__(
         self,
         fire_name,
@@ -78,10 +82,11 @@ class QuicfireRun:
         site_coords,
         domain_size,
         og_path,
+        wind_speed,
         EPSG=5070,
         buffer=50,
         burnplot_done=False,
-        fastfuels_done=False,
+        fastfuels_done=True,
         duet_done=False,
         severity_done=False,
     ):
@@ -97,7 +102,7 @@ class QuicfireRun:
         self.ignition_pace = 5
         # Paths
         self.fire_path = OG_PATH / fire_name
-        qf_name = "_".join([fire_name, site_name, str(domain_size) + "m"])
+        qf_name = "_".join([fire_name, site_name, str(wind_speed) + "mps"])
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
         self.site_path = (
             OG_PATH / fire_name / "Sample_Sites" / site_name / (str(domain_size) + "m")
@@ -114,7 +119,7 @@ class QuicfireRun:
         self.severity_done = severity_done
         # Calculated
         self.wind_dir = None
-        self.wind_speed = 10
+        self.wind_speed = wind_speed
         self.ignition_coords = None
         self.fgrid_zarr = self._import_fgrid_zarr() if fastfuels_done else None
         self.nx = self.fgrid_zarr.attrs["nx"] if fastfuels_done else None
@@ -240,7 +245,7 @@ class QuicfireRun:
             low_coords[0], low_coords[1], center_coords[0], center_coords[1]
         )
         self.wind_dir = int(round(new_wdir))
-        plot_array(topo, f"{self.site_name} topo")
+        # plot_array(topo, f"{self.site_name} topo")
 
     def get_ignition(self):
         """
@@ -366,7 +371,7 @@ class QuicfireRun:
         copy(exe_src, exe_dst)
         # drawfire
         drawfire_dir = Path(
-            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3"
+            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3/quicfire_vis"
         )
         drawfire = []
         for file in drawfire_dir.iterdir():
@@ -404,7 +409,7 @@ class QuicfireRun:
         print("ignite.dat written to {}".format(self.qf_path))
 
     def _import_fgrid_zarr(self):
-        zarr_path = self.qf_path / self.mutable_name
+        zarr_path = self.site_path / self.mutable_name
         zroot = zarr.open(zarr_path, mode="r")
         return zroot
 
