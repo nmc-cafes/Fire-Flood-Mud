@@ -143,10 +143,10 @@ for fire in fires:
     fire_dir = runs_dir / fire
     # sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
     sites = [
-        "CubCreek2_Chewuch_4mps",
-        "CubCreek2_Chewuch_6mps",
-        "CubCreek2_Chewuch_8mps",
-        "CubCreek2_Chewuch_500m",
+        # "CubCreek2_Chewuch_500m",
+        "CubCreek2_Chewuch_low",
+        "CubCreek2_Chewuch_med",
+        "CubCreek2_Chewuch_high",
     ]
     for site in sites:
         print(site)

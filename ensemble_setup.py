@@ -72,7 +72,7 @@ def main():
 
                 qf_run.create_burnplot()
                 qf_run.run_fastfuels()
-                qf_run.modify_margins()
+                qf_run.modify_fuels()
                 qf_run.new_wdir_from_topo()
                 # qf_run.correct_fuelheight()
                 qf_run.get_ignition()
@@ -232,7 +232,7 @@ class QuicfireRun:
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
             )
 
-    def modify_margins(self):
+    def modify_fuels(self):
         margins = _get_margin_indices((self.ny, self.nx), 25)
         rhof = _read_dat_file(
             self.site_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
@@ -244,13 +244,26 @@ class QuicfireRun:
             self.site_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
         )
 
+        # Modify fuels in margins
         rhof[0, :, :][margins] = self.conditions[0]
         moist[0, :, :][margins] = self.conditions[1]
         height[0, :, :][margins] = self.conditions[2]
 
-        plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
-        plot_array(moist[0, :, :], f"modified moisture {self.margins}")
-        plot_array(height[0, :, :], f"modified height {self.margins}")
+        # Modify canopy moisture
+        moist[1:, :, :][np.where(moist[1:, :, :] > 0)] = 0.8
+        for z in range(1, moist.shape[0]):
+            moist_margins = moist[z, :, :][margins]
+            moist_margins[np.where(moist_margins > 0)] = 0.4
+            moist[z, :, :][margins] = moist_margins
+
+        # plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
+        # plot_array(moist[0, :, :], f"modified moisture {self.margins}")
+        # plot_array(height[0, :, :], f"modified height {self.margins}")
+
+        # plot_array(
+        #     moist[1, :, :],
+        #     f"modified moisture {self.margins}",
+        # )
 
         _write_array_to_dat(rhof, "treesrhof.dat", self.site_path, reshape=False)
         _write_array_to_dat(moist, "treesmoist.dat", self.site_path, reshape=False)
