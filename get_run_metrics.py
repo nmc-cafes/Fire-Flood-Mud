@@ -26,19 +26,37 @@ def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     np.savetxt(arrpath / "mass_burnt_pct.txt", mburnt_total)
 
 
+def get_surface_moisture(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
+    moist = sim.get_output("fuels-moist")
+    moist_init = moist.to_numpy(timestep=0)
+    moist_final = moist.to_numpy(timestep=len(moist.times) - 1)
+    moist_init = moist_init[0, 0, :, :]
+    moist_final = moist_final[0, 0, :, :]
+    if plot:
+        plot_array(moist_init, "initial surface fuel moisture")
+        plot_array(moist_final, "final surface fuel moisture")
+
+
 def get_surface_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     dens = sim.get_output("fuels-dens")
     dens_init = dens.to_numpy(timestep=0)
     dens_final = dens.to_numpy(len(dens.times) - 1)
     fuel_present = np.where(dens_init[0, 0, :, :] > 0)
-    no_fuel = np.where(dens_init[0, 0, :, :] == 0)
     surface_consumption = np.zeros((np.shape(dens_init[0, 0, :, :])))
     surface_consumption[fuel_present] = (
         dens_init[0, 0, :, :][fuel_present] - dens_final[0, 0, :, :][fuel_present]
     ) / dens_init[0, 0, :, :][fuel_present]
-    surface_consumption[no_fuel] = np.nan
+    surface_remaining = np.zeros((np.shape(dens_init[0, 0, :, :])))
+    surface_remaining[fuel_present] = 1 - (
+        (dens_init[0, 0, :, :][fuel_present] - dens_final[0, 0, :, :][fuel_present])
+        / dens_init[0, 0, :, :][fuel_present]
+    )
     if plot:
+        print(np.min(dens_init[0, 0, :, :][dens_init[0, 0, :, :] > 0]))
+        plot_array(dens_init[0, 0, :, :], "initial surface fuel density")
+        plot_array(dens_final[0, 0, :, :], "final surface fuel density")
         plot_array(surface_consumption, "surface fuel consumption percent")
+        plot_array(surface_remaining, "surface fuel percent remaining")
     np.savetxt(arrpath / "surface_consumption.txt", surface_consumption)
 
 
@@ -66,10 +84,10 @@ def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = T
         print(np.sum(canopy_init))
         print(np.sum(canopy_init) - np.sum(canopy_final))
         print((np.sum(canopy_init) - np.sum(canopy_final)) / np.sum(canopy_init))
-        plot_array(canopy_init, "initial fuels")
         plot_array(canopy_consumption, "total canopy fuel consumption")
         plot_array(canopy_remaining, "total canopy remaining")
         for z in range(43):
+            plot_array(dens_init[z, :, :], f"initial fuel density layer {z+1}")
             canopy_remaining_z = np.zeros(np.shape(canopy_init))
             fuel_present = np.where(dens_init[z, :, :] > 0)
             canopy_consumption = np.zeros(np.shape(canopy_init))
@@ -184,8 +202,10 @@ for fire in fires:
 
         # print("\t- getting mass burnt")
         # get_mass_burnt(sim_outputs, arrpath, False)
-        # print("\t- getting surface consumption")
-        # get_surface_consumption(sim_outputs, arrpath, False)
+        print("\t- getting surface fuel moisture")
+        get_surface_moisture(sim_outputs, arrpath, True)
+        print("\t- getting surface consumption")
+        get_surface_consumption(sim_outputs, arrpath, True)
         print("\t- getting canopy consumption")
         get_canopy_consumption(sim_outputs, arrpath, True)
         # print("\t- getting max power")
