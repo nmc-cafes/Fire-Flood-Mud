@@ -55,29 +55,28 @@ def main():
             og_path = HERE
 
             print("\n", fire_name, "-", site_name, "\n")
-            for margins, conditions in margins.items():
-                # prepare simulation
-                ff_done = False if margins == "low" else True
-                qf_run = QuicfireRun(
-                    fire_name,
-                    site_name,
-                    fire_date,
-                    site_coords,
-                    domain_size,
-                    og_path,
-                    margins,
-                    conditions,
-                    fastfuels_done=ff_done,
-                )
+            # prepare simulation
+            ff_done = False
+            qf_run = QuicfireRun(
+                fire_name,
+                site_name,
+                fire_date,
+                site_coords,
+                domain_size,
+                og_path,
+                margins="high",
+                conditions=[1.0, 0.05, 1.0],
+                fastfuels_done=ff_done,
+            )
 
-                qf_run.create_burnplot()
-                qf_run.run_fastfuels()
-                qf_run.modify_fuels()
-                qf_run.new_wdir_from_topo()
-                # qf_run.correct_fuelheight()
-                qf_run.get_ignition()
-                # qf_run.draw_ignition()
-                qf_run.quicfire_simulation()
+            qf_run.create_burnplot()
+            qf_run.run_fastfuels()
+            qf_run.modify_fuels()
+            qf_run.new_wdir_from_topo()
+            # qf_run.correct_fuelheight()
+            qf_run.get_ignition()
+            # qf_run.draw_ignition()
+            qf_run.quicfire_simulation()
 
 
 class QuicfireRun:
@@ -113,7 +112,7 @@ class QuicfireRun:
         self.ignition_pace = 5
         # Paths
         self.fire_path = OG_PATH / fire_name
-        qf_name = "_".join([fire_name, site_name, margins])
+        qf_name = "_".join([fire_name, site_name, "canopy10%"])
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
         self.site_path = (
             OG_PATH / fire_name / "Sample_Sites" / site_name / (str(domain_size) + "m")
@@ -250,11 +249,11 @@ class QuicfireRun:
         height[0, :, :][margins] = self.conditions[2]
 
         # Modify canopy moisture
-        moist[1:, :, :][np.where(moist[1:, :, :] > 0)] = 0.8
-        for z in range(1, moist.shape[0]):
-            moist_margins = moist[z, :, :][margins]
-            moist_margins[np.where(moist_margins > 0)] = 0.4
-            moist[z, :, :][margins] = moist_margins
+        moist[1:, :, :][np.where(moist[1:, :, :] > 0)] = 0.1
+        # for z in range(1, moist.shape[0]):
+        #     moist_margins = moist[z, :, :][margins]
+        #     moist_margins[np.where(moist_margins > 0)] = 0.4
+        #     moist[z, :, :][margins] = moist_margins
 
         # plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
         # plot_array(moist[0, :, :], f"modified moisture {self.margins}")

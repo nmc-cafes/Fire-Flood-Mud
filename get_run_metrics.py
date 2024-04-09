@@ -57,13 +57,34 @@ def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = T
     canopy_consumption[fuel_present] = (
         canopy_init[fuel_present] - canopy_final[fuel_present]
     ) / canopy_init[fuel_present]
+    canopy_remaining = np.zeros(np.shape(canopy_init))
+    canopy_remaining[fuel_present] = 1 - (
+        (canopy_init[fuel_present] - canopy_final[fuel_present])
+        / canopy_init[fuel_present]
+    )
     if plot:
         print(np.sum(canopy_init))
-        print(np.sum(canopy_final))
         print(np.sum(canopy_init) - np.sum(canopy_final))
         print((np.sum(canopy_init) - np.sum(canopy_final)) / np.sum(canopy_init))
         plot_array(canopy_init, "initial fuels")
-        plot_array(canopy_consumption, "canopy fuel consumption")
+        plot_array(canopy_consumption, "total canopy fuel consumption")
+        plot_array(canopy_remaining, "total canopy remaining")
+        for z in range(43):
+            canopy_remaining_z = np.zeros(np.shape(canopy_init))
+            fuel_present = np.where(dens_init[z, :, :] > 0)
+            canopy_consumption = np.zeros(np.shape(canopy_init))
+            canopy_consumption_z = np.zeros(np.shape(canopy_init))
+            canopy_consumption_z[fuel_present] = (
+                dens_init[z, :, :][fuel_present] - dens_final[z, :, :][fuel_present]
+            ) / dens_init[z, :, :][fuel_present]
+            canopy_remaining_z[fuel_present] = 1 - (
+                (dens_init[z, :, :][fuel_present] - dens_final[z, :, :][fuel_present])
+                / dens_init[z, :, :][fuel_present]
+            )
+            canopy_z = np.zeros(np.shape(canopy_init))
+            canopy_z[canopy_consumption_z > 0] = 2
+            canopy_z[canopy_remaining_z == 1] = 1
+            plot_array(canopy_z, f"Layer {z+1}, consumption=2, no consumption=1")
     np.savetxt(arrpath / "canopy_consumption.txt", canopy_consumption)
 
 
@@ -144,9 +165,7 @@ for fire in fires:
     # sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
     sites = [
         # "CubCreek2_Chewuch_500m",
-        "CubCreek2_Chewuch_low",
-        "CubCreek2_Chewuch_med",
-        "CubCreek2_Chewuch_high",
+        "CubCreek2_Chewuch_canopy10%"
     ]
     for site in sites:
         print(site)
