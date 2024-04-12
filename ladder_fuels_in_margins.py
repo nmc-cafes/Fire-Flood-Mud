@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 
 WRITE_FUELLIST = True
 COMBINE_FUELS = False
+HERE = Path(__file__).parent
 
 if WRITE_FUELLIST:
     xtb = list(np.linspace(2, 602, num=round(604 / 4)))
@@ -18,12 +19,12 @@ if WRITE_FUELLIST:
 
     num_trees = len(xu) * len(yu)
 
-    x = list(np.repeat(xu, len(yu)))
-    y = list(np.repeat(yu, len(xu)))
+    # MATCH UP xtb xl_yb etc. TO GET TREES ONLY AROUND THE BORDER
+
     id = list(np.repeat(1, num_trees))
     cbh = list(np.repeat(1.0, num_trees))
-    ht = list(np.repeat(5.0, num_trees))
-    cd = list(np.repeat(3.0, num_trees))
+    ht = list(np.repeat(10.0, num_trees))
+    cd = list(np.repeat(5.0, num_trees))
     hcd = list(np.repeat(2.0, num_trees))
     cbd = list(np.repeat(0.5, num_trees))
     cmc = list(np.repeat(1.0, num_trees))
@@ -44,7 +45,6 @@ if WRITE_FUELLIST:
         }
     )
 
-    HERE = Path(__file__).parent
     out_path = HERE / "QF_runs" / "Dixie" / "Dixie_Yellow_500m" / "ladder_fuellist.txt"
 
     df.to_csv(out_path, sep=" ", header=False, index=False)
@@ -56,10 +56,10 @@ if COMBINE_FUELS:
     run_dir = HERE / "QF_runs" / "Dixie" / "Dixie_Yellow_500m"
 
     rhof_og = read_dat_to_array(run_dir, "treesrhof.dat", 302, 302, 78, order="C")
-    rhof_ladder = read_dat_to_array(run_dir, "ladder_rhof.dat", 302, 302, 78, order="C")
+    rhof_ladder = read_dat_to_array(run_dir, "ladder_rhof.dat", 302, 302, 78, order="F")
     moist_og = read_dat_to_array(run_dir, "treesmoist.dat", 302, 302, 78, order="C")
     moist_ladder = read_dat_to_array(
-        run_dir, "ladder_moist.dat", 302, 302, 78, order="C"
+        run_dir, "ladder_moist.dat", 302, 302, 78, order="F"
     )
 
     rhof_out = np.add(rhof_og, rhof_ladder)
@@ -73,6 +73,6 @@ if COMBINE_FUELS:
         plt.title(title, fontsize=18)
         plt.show()
 
-    plot_array(np.sum(rhof_og[1:, :, :], axis=2), "og")
-    plot_array(np.sum(rhof_ladder[1:, :, :], axis=2), "ladder")
-    plot_array(np.sum(rhof_out[1:, :, :], axis=2), "both")
+    plot_array(np.sum(rhof_og[1:, :, :], axis=0), "og")
+    plot_array(np.sum(rhof_ladder[1:, :, :], axis=0), "ladder")
+    plot_array(np.sum(rhof_out[1:, :, :], axis=0), "both")

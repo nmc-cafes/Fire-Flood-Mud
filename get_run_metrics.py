@@ -29,13 +29,37 @@ def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     return mburnt_total
 
 
+def get_surface_moisture(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
+    moist = sim.get_output("fuels-moist")
+    moist_init = moist.to_numpy(timestep=0)
+    moist_final = moist.to_numpy(timestep=len(moist.times) - 1)
+    moist_init = moist_init[0, 0, :, :]
+    moist_final = moist_final[0, 0, :, :]
+    if plot:
+        plot_array(moist_init, "initial surface fuel moisture")
+        plot_array(moist_final, "final surface fuel moisture")
+
+
 def get_surface_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     dens = sim.get_output("fuels-dens")
     dens_init = dens.to_numpy(timestep=0)
     dens_final = dens.to_numpy(len(dens.times) - 1)
-    surface_consumption = dens_init[0, 0, :, :] - dens_final[0, 0, :, :]
+    fuel_present = np.where(dens_init[0, 0, :, :] > 0)
+    surface_consumption = np.zeros((np.shape(dens_init[0, 0, :, :])))
+    surface_consumption[fuel_present] = (
+        dens_init[0, 0, :, :][fuel_present] - dens_final[0, 0, :, :][fuel_present]
+    ) / dens_init[0, 0, :, :][fuel_present]
+    surface_remaining = np.zeros((np.shape(dens_init[0, 0, :, :])))
+    surface_remaining[fuel_present] = 1 - (
+        (dens_init[0, 0, :, :][fuel_present] - dens_final[0, 0, :, :][fuel_present])
+        / dens_init[0, 0, :, :][fuel_present]
+    )
     if plot:
-        plot_array(surface_consumption, "surface fuel consumption")
+        print(np.min(dens_init[0, 0, :, :][dens_init[0, 0, :, :] > 0]))
+        plot_array(dens_init[0, 0, :, :], "initial surface fuel density")
+        plot_array(dens_final[0, 0, :, :], "final surface fuel density")
+        plot_array(surface_consumption, "surface fuel consumption percent")
+        plot_array(surface_remaining, "surface fuel percent remaining")
     np.savetxt(arrpath / "surface_consumption.txt", surface_consumption)
     return surface_consumption
 
@@ -44,12 +68,45 @@ def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = T
     dens = sim.get_output("fuels-dens")
     dens_init = dens.to_numpy(timestep=0)
     dens_final = dens.to_numpy(len(dens.times) - 1)
-    canopy_consumption = np.sum(dens_init[:, 1:, :, :], axis=1) - np.sum(
-        dens_final[:, 1:, :, :], axis=1
+    dens_init = dens_init[0, 1:, :, :]
+    dens_final = dens_final[0, 1:, :, :]
+    canopy_init = np.sum(dens_init, axis=0)
+    canopy_final = np.sum(dens_final, axis=0)
+    fuel_present = np.where(canopy_init > 0)
+    canopy_consumption = np.zeros(np.shape(canopy_init))
+    fuels_present = np.zeros(np.shape(canopy_init))
+    fuels_present[fuel_present] = 1
+    canopy_consumption[fuel_present] = (
+        canopy_init[fuel_present] - canopy_final[fuel_present]
+    ) / canopy_init[fuel_present]
+    canopy_remaining = np.zeros(np.shape(canopy_init))
+    canopy_remaining[fuel_present] = 1 - (
+        (canopy_init[fuel_present] - canopy_final[fuel_present])
+        / canopy_init[fuel_present]
     )
-    canopy_consumption = canopy_consumption[0, :, :]
     if plot:
-        plot_array(canopy_consumption, "canopy fuel consumption")
+        print(np.sum(canopy_init))
+        print(np.sum(canopy_init) - np.sum(canopy_final))
+        print((np.sum(canopy_init) - np.sum(canopy_final)) / np.sum(canopy_init))
+        plot_array(canopy_consumption, "total canopy fuel consumption")
+        plot_array(canopy_remaining, "total canopy remaining")
+        for z in range(43):
+            plot_array(dens_init[z, :, :], f"initial fuel density layer {z+1}")
+            canopy_remaining_z = np.zeros(np.shape(canopy_init))
+            fuel_present = np.where(dens_init[z, :, :] > 0)
+            canopy_consumption = np.zeros(np.shape(canopy_init))
+            canopy_consumption_z = np.zeros(np.shape(canopy_init))
+            canopy_consumption_z[fuel_present] = (
+                dens_init[z, :, :][fuel_present] - dens_final[z, :, :][fuel_present]
+            ) / dens_init[z, :, :][fuel_present]
+            canopy_remaining_z[fuel_present] = 1 - (
+                (dens_init[z, :, :][fuel_present] - dens_final[z, :, :][fuel_present])
+                / dens_init[z, :, :][fuel_present]
+            )
+            canopy_z = np.zeros(np.shape(canopy_init))
+            canopy_z[canopy_consumption_z > 0] = 2
+            canopy_z[canopy_remaining_z == 1] = 1
+            plot_array(canopy_z, f"Layer {z+1}, consumption=2, no consumption=1")
     np.savetxt(arrpath / "canopy_consumption.txt", canopy_consumption)
     return canopy_consumption
 
@@ -128,29 +185,16 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
     return max_react
 
 
-def _read_dat_file(
-    dire: Path, filename: str, arr_dim: tuple, order: str = "C"
-) -> np.array:
-    """
-    Read in a .dat file as a numpy array.
-
-    Dimensions of the array must be known, and in the order (z,y,x)
-    """
-
-    # Import and reshape .dat file
-    path = dire / filename
-    with open(path, "rb") as fin:
-        arr = FortranFile(fin).read_reals(dtype="float32").reshape(arr_dim, order=order)
-
-    return arr
-
-
-all_data = pd.DataFrame()
-fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
-for fire in ["Caldor"]:
+# fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+fires = ["CubCreek2"]
+for fire in fires:
     fire_dir = runs_dir / fire
-    sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
-    for site in ["Caldor_Camp2_500m", "Caldor_Camp2_500m_duet"]:
+    # sites = [path.name for path in fire_dir.iterdir() if path.is_dir()]
+    sites = [
+        # "CubCreek2_Chewuch_500m",
+        "CubCreek2_Chewuch_canopy10%"
+    ]
+    for site in sites:
         print(site)
         runpath = fire_dir / site
         quic_fire = QUIC_fire.from_file(runpath, version="latest")
@@ -165,33 +209,19 @@ for fire in ["Caldor"]:
         arrpath = runpath / "Arrays"
         arrpath.mkdir(exist_ok=True)
 
-        print("\t- getting mass burnt")
-        mburnt = get_mass_burnt(sim_outputs, arrpath, True)
+        # print("\t- getting mass burnt")
+        # get_mass_burnt(sim_outputs, arrpath, False)
+        print("\t- getting surface fuel moisture")
+        get_surface_moisture(sim_outputs, arrpath, True)
         print("\t- getting surface consumption")
-        surf_cons = get_surface_consumption(sim_outputs, arrpath, True)
+        get_surface_consumption(sim_outputs, arrpath, True)
         print("\t- getting canopy consumption")
-        canopy_cons = get_canopy_consumption(sim_outputs, arrpath, True)
-        print("\t- getting max power")
-        max_power = get_max_power(sim_outputs, arrpath, True)
-        print("\t- getting residence time from power")
-        res_power = get_residence_time_from_power(sim_outputs, arrpath, True)
-        print("\t- getting residence time from consumption")
-        res_cons = get_residence_time_from_consumption(sim_outputs, arrpath, True)
-        print("\t- getting max reaction rate")
-        max_react = get_max_reaction_rate(sim_outputs, arrpath, True)
-
-        d = {
-            "mass_burnt_pct": list(mburnt.flatten()),
-            "surface_consumption": list(surf_cons.flatten()),
-            "canopy_consumption": list(canopy_cons.flatten()),
-            "max_power": list(max_power.flatten()),
-            "residence_time_from_power": list(res_power.flatten()),
-            "residence_time_from_consumption": list(res_cons.flatten()),
-            "max_reaction_rate": list(max_react.flatten()),
-        }
-        option = "duet" if site == "Caldor_Camp2_500m_duet" else "no_duet"
-        df = pd.DataFrame(d)
-        df["option"] = option
-        all_data = pd.concat([all_data, df])
-
-all_data.to_csv(Path(__file__).parent / "duet_compare_Camp2.csv")
+        get_canopy_consumption(sim_outputs, arrpath, True)
+        # print("\t- getting max power")
+        # get_max_power(sim_outputs, arrpath, False)
+        # print("\t- getting residence time from power")
+        # get_residence_time_from_power(sim_outputs, arrpath, False)
+        # print("\t- getting residence time from consumption")
+        # get_residence_time_from_consumption(sim_outputs, arrpath, False)
+        # print("\t- getting max reaction rate")
+        # get_max_reaction_rate(sim_outputs, arrpath, False)
