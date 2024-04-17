@@ -48,13 +48,10 @@ def main():
         crs="EPSG:5070",
     )
 
-    low = [0.5, 0.15, 0.5]
-    med = [0.75, 0.1, 0.75]
-    high = [1.0, 0.05, 1.0]
-    margins = {"low": low, "med": med, "high": high}
+    conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i == 0:
+        if i == 9:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -64,7 +61,6 @@ def main():
 
             print("\n", fire_name, "-", site_name, "\n")
             # prepare simulation
-            ff_done = False
             qf_run = QuicfireRun(
                 fire_name,
                 site_name,
@@ -72,17 +68,18 @@ def main():
                 site_coords,
                 domain_size,
                 og_path,
-                fastfuels_done=True,
-                duet_done=True,
+                conditions,
+                fastfuels_done=False,
+                duet_done=False,
             )
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
             qf_run.modify_fuels()
-            qf_run.new_wdir_from_topo()
             # qf_run.correct_fuelheight()
             qf_run.get_ignition()
             qf_run.run_duet()
             qf_run.calibrate_duet()
+            qf_run.modify_fuels()
             # qf_run.draw_ignition()
             qf_run.quicfire_simulation()
 
@@ -97,7 +94,6 @@ class QuicfireRun:
         site_coords,
         domain_size,
         og_path,
-        margins,
         conditions,
         EPSG=5070,
         buffer=50,
@@ -115,12 +111,11 @@ class QuicfireRun:
         self.domain_size = domain_size
         self.EPSG = EPSG
         self.buffer = buffer
-        self.margins = margins
         self.conditions = conditions
         self.ignition_pace = 5
         # Paths
         self.fire_path = OG_PATH / fire_name
-        qf_name = "_".join([fire_name, site_name, "canopy10%"])
+        qf_name = "_".join([fire_name, site_name, "duet"])
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
         self.site_path = (
             OG_PATH / fire_name / "Sample_Sites" / site_name / (str(domain_size) + "m")
@@ -219,6 +214,11 @@ class QuicfireRun:
             # Copy the data from the immutable zarr store to the mutable zarr store
             zarr.copy_all(zroot, zarr_mutable)
 
+            fastfuels.export_zarr_to_quicfire(zroot, self.site_path)
+
+            # Get new wind direction from the fastfuels topo file
+            self.new_wdir_from_topo()
+
             fastfuels.export_zarr_to_duet(
                 zroot,
                 self.site_path,
@@ -227,7 +227,6 @@ class QuicfireRun:
                 wind_var=360,
                 duration=5,
             )
-            fastfuels.export_zarr_to_quicfire(zroot, self.site_path)
 
             self.fastfuels_done = True
             self.nx = zroot.attrs["nx"]
@@ -427,7 +426,7 @@ class QuicfireRun:
 
         # assemble ensemble
         self.qf_path.mkdir(exist_ok=True)
-        sim.write_inputs(self.qf_path)
+        sim.to_json(self.qf_path / f"f{self.site_name}.json")
 
         # copy dat files and exe
         # dat files
@@ -562,12 +561,12 @@ class QuicfireRun:
         treesmoist = _read_dat_file(
             self.site_path, "treesmoist.dat", arr_dim=(self.nz, self.ny, self.nx)
         )
-        plot_array(treesrhof[0, :, :], "treesrhof fastfuels")
-        plot_array(duet_density, "calibrated rhof")
+        # plot_array(treesrhof[0, :, :], "treesrhof fastfuels")
+        # plot_array(duet_density, "calibrated rhof")
         treesrhof[0, :, :] = duet_density
         treesfueldepth[0, :, :] = duet_height
         treesmoist[0, :, :] = duet_moisture
-        plot_array(treesrhof[0, :, :], "treeshrhof calibrated")
+        # plot_array(treesrhof[0, :, :], "treeshrhof calibrated")
 
         _write_array_to_dat(treesrhof, "treesrhof.dat", self.qf_path, reshape=False)
         _write_array_to_dat(
