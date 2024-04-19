@@ -51,7 +51,7 @@ def main():
     conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i == 9:
+        if i == 6:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -70,7 +70,7 @@ def main():
                 og_path,
                 conditions,
                 fastfuels_done=False,
-                duet_done=False,
+                duet_done=True,
             )
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
@@ -215,6 +215,10 @@ class QuicfireRun:
             zarr.copy_all(zroot, zarr_mutable)
 
             fastfuels.export_zarr_to_quicfire(zroot, self.site_path)
+            self.nx = zroot.attrs["nx"]
+            self.ny = zroot.attrs["ny"]
+            self.nz = zroot.attrs["nz"]
+            self.fgrid_zarr = zarr_mutable
 
             # Get new wind direction from the fastfuels topo file
             self.new_wdir_from_topo()
@@ -229,10 +233,7 @@ class QuicfireRun:
             )
 
             self.fastfuels_done = True
-            self.nx = zroot.attrs["nx"]
-            self.ny = zroot.attrs["ny"]
-            self.nz = zroot.attrs["nz"]
-            self.fgrid_zarr = zarr_mutable
+
         else:
             print(
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
@@ -426,7 +427,7 @@ class QuicfireRun:
 
         # assemble ensemble
         self.qf_path.mkdir(exist_ok=True)
-        sim.to_json(self.qf_path / f"f{self.site_name}.json")
+        sim.to_json(self.qf_path / f"{self.site_name}.json")
 
         # copy dat files and exe
         # dat files
