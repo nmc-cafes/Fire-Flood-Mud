@@ -14,7 +14,7 @@ library(tidyverse)
 library(tidyterra)
 
 #### DEFINE FUNCTIONS ####
-ext_buff <- function(rst, buffer = -25){
+ext_buff <- function(rst, buffer = -50){
   new_ext <- ext(rst)
   new_ext[1] <- new_ext[1] - buffer
   new_ext[2] <- new_ext[2] + buffer
@@ -45,10 +45,12 @@ pts_to_pol <- function(mtbs_pts){
 
 #### ASSEMBLE DATASET ####
 fires <- c("Caldor","CedarCreek","CubCreek2","Dixie","KNP")
-sizes <- c(500)
+sizes <- c("duet")
 outputs <- c("mass_burnt_pct",
              "surface_consumption",
+             "surface_remaining",
              "canopy_consumption",
+             "canopy_remaining",
              "max_power",
              "residence_time_power",
              "residence_time_consumption",
@@ -80,23 +82,27 @@ for(fire in fires){
       plot_bounds <- vect(here(fire,
                                "Sample_Sites",
                                site,
-                               paste0(size,"m"),
-                               paste0(site,"_bounds_",size,"m.shp")))
+                               paste0("500m"),
+                               paste0(site,"_bounds_500m.shp")))
       mtbs_crop <- crop(mtbs, ext(plot_bounds))
       mtbs_pts <- as.points(mtbs_crop)
       sev_pts <- terra::extract(severity, mtbs_pts, bind=T, ID=F)
       site_pts <- terra::extract(slope, sev_pts, bind=T, ID=F)
       site_pol <- pts_to_pol(site_pts)
+      site_pol <- crop(site_pol, ext_buff(plot_bounds))
       first_output <- T
       for(output in outputs){
         cat("\t",output,"\n")
-        out_arr <- read.table(here("Arrays",
+        out_arr <- read.table(here("Duet_Arrays",
                                    fire, 
-                                   paste0(fire,"_",site,"_",size,"m"),
+                                   paste0(fire,"_",site,"_",size),
                                    "Arrays",
                                    paste0(output,".txt")))
         out_rst <- output_to_rst(output, out_arr, plot_bounds)
-        out_crop <- crop(out_rst, ext_buff(out_rst))
+        out_crop <- crop(out_rst, ext_buff(plot_bounds))
+        if(output=="canopy_consumption"){
+          plot(out_crop)
+        }
         if(first_output){
           out_vect <- terra::extract(out_crop,
                                      site_pol,
@@ -138,4 +144,4 @@ for(fire in fires){
 }
 
 all_data <- as_tibble(fire_vect)
-write.csv(all_data, here("all_data.csv"), row.names = F)
+write.csv(all_data, here("all_data_duet.csv"), row.names = F)
