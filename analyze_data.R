@@ -8,13 +8,17 @@ dat <- read.csv(here("all_data_duet.csv")) %>%
   mutate(severity = case_when(severity==1 ~ "unburned",
                               severity==2 ~ "low",
                               severity==3 ~ "moderate",
-                              severity==4 ~ "high"))
+                              severity==4 ~ "high")) %>%
+  group_by(fire) %>%
+  mutate(dNBR_scaled = scale(dNBR)) %>%
+  ungroup()
 
 # explore!
 
 dat_site <- dat %>%
   group_by(site, fire) %>%
   summarize(dNBR = mean(dNBR),
+            dNBR_scaled = mean(dNBR_scaled),
             high_sev_pct = mean(severity%in%c("moderate","high")*100),
             mass_burnt_pct = mean(mass_burnt_pct),
             surface_consumption = mean(surface_consumption,na.rm=T)*100,
@@ -60,7 +64,7 @@ dat_site_fire %>%
   theme_bw()
 
 dat_site_fire_long <- dat_site_fire %>%
-  pivot_longer(cols = 5:10,
+  pivot_longer(cols = 6:11,
                values_to = "val",
                names_to = "var") %>%
   mutate(var = factor(var, 
@@ -76,6 +80,18 @@ dat_site_fire_long <- dat_site_fire %>%
                                  "Average Max Power (W/m^3)",
                                  "Average Residence Time (s)\n- from power",
                                  "Average Residence Time (s)\n- from consumption")))
+
+dNBR_scaled <- dat_site_fire_long %>%
+  ggplot() +
+  geom_point(aes(val,dNBR_scaled,color=fire)) +
+  geom_smooth(aes(val,dNBR_scaled), method="lm", color = "black") +
+  facet_wrap(.~var, scales="free_x") +
+  scale_color_colorblind() +
+  labs(x="",
+       y="Scaled dNBR",
+       color = "Focal Fire") +
+  theme_bw()
+dNBR_scaled
 
 dNBR <- dat_site_fire_long %>%
   ggplot() +
@@ -283,7 +299,8 @@ final_mod <- lm(dNBR ~ residence_time_consumption, data=dat_site_fire)
 summary(final_mod)
 
 # tray a mixed model?
-library(lme4)
+library(lmerTest)
+library(MuMIn)
 mod_mixed <- lmer(dNBR ~ 
                     mass_burnt_pct + 
                     surface_consumption +
@@ -294,3 +311,57 @@ mod_mixed <- lmer(dNBR ~
                     (1 | fire),
                   data=dat_site_fire)
 summary(mod_mixed)
+AICc(mod_mixed)
+
+# mass_burnt should not be used with either of the consumption variables
+# only one residence time should be used
+
+f1 <- dNBR ~ mass_burnt_pct + max_power + residence_time_power + (1 | fire)
+f2 <- dNBR ~ mass_burnt_pct + max_power + residence_time_consumption + (1 | fire)
+f3 <- dNBR ~ surface_consumption + canopy_consumption + max_power + residence_time_power + (1 | fire)
+f4 <- dNBR ~ surface_consumption + canopy_consumption + max_power + residence_time_consumption + (1 | fire)
+f5 <- dNBR ~ surface_consumption + max_power + residence_time_power + (1 | fire)
+f6 <- dNBR ~ surface_consumption + max_power + residence_time_consumption + (1 | fire)
+f7 <- dNBR ~ canopy_consumption + max_power + residence_time_power + (1 | fire)
+f8 <- dNBR ~ canopy_consumption + max_power + residence_time_consumption + (1 | fire)
+f9 <- dNBR ~ mass_burnt_pct + residence_time_power + (1 | fire)
+f10 <- dNBR ~ mass_burnt_pct + residence_time_consumption + (1 | fire)
+f11 <- dNBR ~ surface_consumption + canopy_consumption + residence_time_power + (1 | fire)
+f12 <- dNBR ~ surface_consumption + canopy_consumption + residence_time_consumption + (1 | fire)
+f13 <- dNBR ~ surface_consumption + residence_time_power + (1 | fire)
+f14 <- dNBR ~ surface_consumption + residence_time_consumption + (1 | fire)
+f15 <- dNBR ~ canopy_consumption + residence_time_power + (1 | fire)
+f16 <- dNBR ~ canopy_consumption + residence_time_consumption + (1 | fire)
+f17 <- dNBR ~ max_power + residence_time_power + (1 | fire)
+f18 <- dNBR ~ max_power + residence_time_consumption + (1 | fire)
+f19 <- dNBR ~ mass_burnt_pct + max_power + (1 | fire)
+f20 <- dNBR ~ surface_consumption + canopy_consumption + max_power + (1 | fire)
+f21 <- dNBR ~ surface_consumption + max_power + (1 | fire)
+f22 <- dNBR ~ canopy_consumption + max_power + (1 | fire)
+f23 <- dNBR ~ mass_burnt_pct + (1 | fire)
+f24 <- dNBR ~ surface_consumption + canopy_consumption + (1 | fire)
+f25 <- dNBR ~ surface_consumption + (1 | fire)
+f26 <- dNBR ~ canopy_consumption + (1 | fire)
+f26 <- dNBR ~ max_power + (1 | fire)
+f27 <- dNBR ~ residence_time_power + (1 | fire)
+f28 <- dNBR ~ residence_time_consumption + (1 | fire)
+
+formulae <- c(f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,f21,f22,f23,
+              f24,f25,f26,f27,f28)
+aic_df <- tibble("model" = seq(1,length(formulae)), "AICc" = rep(NA, length(formulae)))
+for(i in 1:length(formulae)){
+  mod <- lmer(formulae[i][[1]], data = dat_site_fire)
+  aicc <- AICc(mod)
+  aic_df$AICc[i] <- aicc
+}
+
+ggplot(aic_df, aes(model,AICc)) + geom_point()
+selected <- paste0("f",aic_df[which.min(aic_df$AICc),"model"])
+
+print(f24)
+library(DHARMa)
+final_model <- lmer(f24, data = dat_site_fire)
+mod_sim <- simulateResiduals(final_model)
+plot(mod_sim)
+
+summary(final_model)
