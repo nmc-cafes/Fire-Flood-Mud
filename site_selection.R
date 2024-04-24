@@ -1,40 +1,9 @@
-
-# Sample Site Selection
-# 
-# - Slopes > 23 deg
-# - Proximity to drainages (large? small?)
-#   - not too close, not too far
-# - Elevational gradient?
-
 library(here)
 library(tidyverse)
 library(terra)
 library(tidyterra)
 
-EPSG <- 5070
-all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
-
-## Process fire perimeters 
-# ca_fires <- c("DIXIE","CALDOR","KNP COMPLEX")
-fires <- c("DIXIE","CALDOR","KNP COMPLEX","CUB CREEK 2","CEDAR CREEK")
-mtbs <- vect(here("mtbs_perimeter_data","mtbs_perims_DD.shp"))
-mtbs$Ig_Date <- as.Date(mtbs$Ig_Date)
-recent_fires <- mtbs[mtbs$Ig_Date > as.Date("2020-01-01")]
-focal_fires <- recent_fires[startsWith(recent_fires$Event_ID,"WA") | startsWith(recent_fires$Event_ID,"CA")]
-for(fire in focal_fires){
-  focal_fire <- focal_fires[focal_fires$Incid_Name==fire]
-  if(nrow(focal_fire)==1){
-    focal_fire <- project(focal_fire, paste0("EPSG:",EPSG))
-    plot(focal_fire)
-    writeVector(focal_fire,here("Fire_Perimeters",paste0(fire,".shp")),overwrite=T)
-  } else
-    print("multiple fires of same name in same state: ", fire)
-}
-
-# NOTE: Manually move each perimeter from Fire_Perimeters to the directories
-# of their respective fires, and rename them with the directory name, followed
-# by _perimeter.shp
-
+## Functions
 clip_to_fire <- function(x, perimeter, EPSG){
   x <- project(x, paste0("EPSG:",EPSG))
   x_crop <- crop(x, perimeter)
@@ -42,64 +11,6 @@ clip_to_fire <- function(x, perimeter, EPSG){
   return(x_mask)
 }
 
-## Process DEMs
-fires <- c("Dixie","Caldor","KNP","CubCreek2","CedarCreek")
-for(fire in fires){
-  print(fire)
-  perimeter <- vect(here(fire,paste0(fire,"_perimeter.shp")))
-  file_list <- list.files(here(fire,"DEM"))
-  tile_list <- list()
-  for(i in 1:length(file_list)){
-    tile_list[i] <- rast(here(fire,"DEM",file_list[i]))
-  }
-  print("   -collecting")
-  collection <- sprc(tile_list)
-  print("   -merging")
-  merged <- mosaic(collection)
-  print("   -clipping")
-  merged_clip <- clip_to_fire(merged, perimeter, EPSG)
-  print("   -plotting")
-  plot(merged_clip)
-  print("   -writing")
-  writeRaster(merged_clip, here(fire,paste0(fire,"_DEM.tif")), overwrite = T)
-}
-
-## Functions
-progress_bar <- function(iter,max_iter){
-  if(iter == 1){
-    cat("|----------|")
-  }
-  if(iter==max_iter/10){
-    cat("\n|=---------|")
-  }
-  if(iter==(max_iter/10)*2){
-    cat("\n|==--------|")
-  }
-  if(iter==(max_iter/10)*3){
-    cat("\n|===-------|")
-  }
-  if(iter==(max_iter/10)*4){
-    cat("\n|====------|")
-  }
-  if(iter==(max_iter/10)*5){
-    cat("\n|=====-----|")
-  }
-  if(iter==(max_iter/10)*6){
-    cat("\n|======----|")
-  }
-  if(iter==(max_iter/10)*7){
-    cat("\n|=======---|")
-  }
-  if(iter==(max_iter/10)*8){
-    cat("\n|========--|")
-  }
-  if(iter==(max_iter/10)*9){
-    cat("\n|=========-|")
-  }
-  if(iter==max_iter-1){
-    cat("\n|==========|\n")
-  }
-}
 
 slope_mask <- function(fire_name){
   DEM <- rast(here(fire_name,paste0(fire_name,"_DEM.tif")))
@@ -186,7 +97,60 @@ filter_distance <- function(raster, size, min_dist, max_iters=1e6){
   return(vector)
 }
 
-fires <- c("Dixie","KNP","Caldor","CubCreek2","CedarCreek")
+EPSG <- 5070
+all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
+
+## Process fire perimeters 
+# ca_fires <- c("DIXIE","CALDOR","KNP COMPLEX")
+PERIMETERS_DONE = TRUE
+if(PERIMETERS_DONE==FALSE){
+  fires <- c("DIXIE","CALDOR","KNP COMPLEX","CUB CREEK 2","CEDAR CREEK")
+  mtbs <- vect(here("mtbs_perimeter_data","mtbs_perims_DD.shp"))
+  mtbs$Ig_Date <- as.Date(mtbs$Ig_Date)
+  recent_fires <- mtbs[mtbs$Ig_Date > as.Date("2020-01-01")]
+  focal_fires <- recent_fires[startsWith(recent_fires$Event_ID,"WA") | startsWith(recent_fires$Event_ID,"CA")]
+  for(fire in fires){
+    focal_fire <- focal_fires[focal_fires$Incid_Name==fire]
+    if(nrow(focal_fire)==1){
+      focal_fire <- project(focal_fire, paste0("EPSG:",EPSG))
+      plot(focal_fire)
+      writeVector(focal_fire,here("Fire_Perimeters",paste0(fire,".shp")),overwrite=T)
+    } else
+      print("multiple fires of same name in same state: ", fire)
+  }
+}
+
+# NOTE: Manually move each perimeter from Fire_Perimeters to the directories
+# of their respective fires, and rename them with the directory name, followed
+# by _perimeter.shp
+
+fires <- c("Dixie","Caldor","KNP","CubCreek2","CedarCreek")
+
+## Process DEMs
+DEM_DONE = TRUE
+if(DEM_DONE == FALSE){
+  for(fire in fires){
+    print(fire)
+    perimeter <- vect(here(fire,paste0(fire,"_perimeter.shp")))
+    file_list <- list.files(here(fire,"DEM"))
+    tile_list <- list()
+    for(i in 1:length(file_list)){
+      tile_list[i] <- rast(here(fire,"DEM",file_list[i]))
+    }
+    print("   -collecting")
+    collection <- sprc(tile_list)
+    print("   -merging")
+    merged <- mosaic(collection)
+    print("   -clipping")
+    merged_clip <- clip_to_fire(merged, perimeter, EPSG)
+    print("   -plotting")
+    plot(merged_clip)
+    print("   -writing")
+    writeRaster(merged_clip, here(fire,paste0(fire,"_DEM.tif")), overwrite = T)
+  }
+}
+
+## Select Sites
 for(fire_name in fires){
   print(fire_name)
   perimeter <- vect(here(fire_name,paste0(fire_name,"_perimeter.shp")))
@@ -221,11 +185,3 @@ for(fire_name in fires){
   }
 }
 
-
-ggplot() +
-  geom_spatvector(data = perimeter) +
-  geom_spatraster(data = drainage_23_severe) +
-  scale_fill_terrain_c() +
-  geom_spatvector(data = sample_sites_spaced) +
-  # geom_spatvector(data = sample_sites, color = "red")
-  theme_bw()
