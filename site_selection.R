@@ -37,16 +37,41 @@ drainage_proximity <- function(fire_name, fire_perimeter, streams, buffer_inner,
   return(drainage_buffer)
 }
 
-high_severity <- function(fire_name, perimeter, EPSG){
+severity_pct <- function(fire_name, perimeter, severity_class, EPSG){
   severity <- rast(here(fire_name, paste0(fire_name,"_Severity.tif")))
   severity_clip <- clip_to_fire(severity, perimeter, EPSG)
-  rcl_mat = matrix(c(0,2,NA,
-                     3,4,1,
-                     5,Inf, NA),
-                   nrow = 3,
-                   byrow = T)
+  if(severity_class=="high"){
+    rcl_mat = matrix(c(0,3,0,
+                       4,4,1,
+                       5,Inf, 0),
+                     nrow = 3,
+                     byrow = T)
+  } else if(severity_class=="moderate"){
+    rcl_mat = matrix(c(0,2,0,
+                       3,3,1,
+                       4,Inf, 0),
+                     nrow = 3,
+                     byrow = T)
+  } else if(severity_class=="low"){
+    rcl_mat = matrix(c(0,0,0,
+                       1,2,1,
+                       3,Inf, 0),
+                     nrow = 3,
+                     byrow = T)
+  }
   severity_classify <- classify(severity, rcl_mat, right=NA)
-  return(severity_classify)
+  sev_pct <- focal(severity_classify, w=17, fun = "mean", na.policy = "omit", na.rm=T)
+  names(sev_pct) <- severity_class
+  return(sev_pct)
+}
+
+severity_rcl <- function(rst, threshold){
+  rcl_mat <- matrix(c(0,threshold,NA,
+                      threshold,1.0,1),
+                    nrow=2,
+                    byrow=T)
+  rst_cls <- classify(rst, rcl_mat, include.lowest=T)
+  return(rst_cls)
 }
 
 filter_distance <- function(raster, size, min_dist, max_iters=1e6){
@@ -82,7 +107,6 @@ filter_distance <- function(raster, size, min_dist, max_iters=1e6){
       }
     }
     iters <- iters+1
-    progress_bar(iters,max_iters)
     if(iters > max_iters){
       cat('Maximum number of iterations reached.\n')
       cat("number of points found:", nc-1,"\n")
@@ -93,6 +117,18 @@ filter_distance <- function(raster, size, min_dist, max_iters=1e6){
   samples$y <- samples$y * reso + ymin(raster)
   vector <- vect(samples, geom=c("x", "y"), crs=CRS, keepgeom=FALSE)
   return(vector)
+}
+
+sample_stratified <- function(rst_stk, size){
+  if(size%%3!=0){
+    stop("size must be divisible by 3")
+  }
+  size_strat <- size/3
+  high_sev <- filter_distance(rst_stk["high"], size = size_strat, min_dist = 1000)
+  mod_sev <- filter_distance(rst_stk["moderate"], size = size_strat, min_dist = 1000)
+  low_sev <- filter_distance(rst_stk["low"], size = size_strat, min_dist = 1000)
+  sample_sites <- rbind(high_sev,mod_sev,low_sev)
+  return(sample_sites)
 }
 
 EPSG <- 5070
@@ -159,26 +195,34 @@ for(fire_name in fires){
   # must be at least 500m from the edge of the fire perimeter
   print("   border")
   perimeter_buffer <- buffer(perimeter, -500)
-  drainages_fire <- clip_to_fire(upslope_zone, perimeter_buffer, EPSG)
+  upslope_fire <- clip_to_fire(upslope_zone, perimeter_buffer, EPSG)
   # slope must be at least 23 deg
   print("   slope")
   slope_23 <- slope_mask(fire_name)
-  # severity must be medium or high
+  # stratify across severity
   print("   severity")
-  severity <- high_severity(fire_name, perimeter_buffer, EPSG)
+  high_sev_pct <- severity_pct(fire_name, perimeter_buffer, "high", EPSG)
+  mod_sev_pct <- severity_pct(fire_name, perimeter_buffer, "moderate", EPSG)
+  low_sev_pct <- severity_pct(fire_name, perimeter_buffer, "low", EPSG)
+  high_severity <- severity_rcl(high_sev_pct, threshold=0.5)
+  moderate_severity <- severity_rcl(mod_sev_pct, threshold=0.5)
+  low_severity <- severity_rcl(low_sev_pct, threshold=0.5)
+  severity_stack <- c(high_severity,moderate_severity,low_severity)
   # combine all 4 criteria
   print("   combine")
-  drainage_23 <- clip_to_fire(slope_23, drainages_fire, EPSG)
-  drainage_23_project <- project(drainage_23, severity, method = "near")
-  drainage_23_severe <- severity * drainage_23_project
+  upslope_23 <- clip_to_fire(slope_23, upslope_fire, EPSG)
+  upslope_23_project <- project(upslope_23, severity_stack, method = "near")
+  upslope_23_severity <- severity_stack * upslope_23_project
   # randomly sample sites, making sure they are at least 1km apart
   print("   sample")
-  sample_sites_spaced <- filter_distance(drainage_23_severe, size = 5, min_dist = 1000)
-  if(nrow(sample_sites_spaced)==5){
+  size <- 15
+  sample_sites <- sample_stratified(upslope_23_severity, size)
+  if(nrow(sample_sites)==size){
     print("   write")
-    writeVector(sample_sites_spaced, here(fire_name,paste0(fire_name,"_sample_sites_NEW.shp")),overwrite=T)
+    writeVector(sample_sites, here(fire_name,paste0(fire_name,"_sample_sites_NEW.shp")),overwrite=T)
   } else{
     print("Not enough sample sites. Consider increasing spatSample size")
   }
 }
+
 
