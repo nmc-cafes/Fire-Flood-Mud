@@ -11,7 +11,6 @@ clip_to_fire <- function(x, perimeter, EPSG){
   return(x_mask)
 }
 
-
 slope_mask <- function(fire_name){
   DEM <- rast(here(fire_name,paste0(fire_name,"_DEM.tif")))
   slope <- terrain(DEM, v="slope", neighbors=8, unit="degrees")
@@ -23,19 +22,18 @@ slope_mask <- function(fire_name){
   return(slope_rcl)
 }
 
-drainage_proximity <- function(fire_name, streams, buffer_outer, buffer_inner, EPSG, overwrite = T){
-  print("      Generating outer buffer...")
-  drainage_buffer_outer <- buffer(streams, buffer_outer)
-  drainage_buffer_outer <- aggregate(drainage_buffer_outer, dissolve=T)
+drainage_proximity <- function(fire_name, fire_perimeter, streams, buffer_inner, EPSG, save = F, overwrite = T){
   print("      Generating inner buffer...")
   drainage_buffer_inner <- buffer(streams, buffer_inner)
   drainage_buffer_inner <- aggregate(drainage_buffer_inner, dissolve=T)
-  print("      Removing inner polygon...")
-  drainage_buffer <- erase(drainage_buffer_outer, drainage_buffer_inner)
-  print("      Saving file...")
-  writeVector(drainage_buffer,
-              here(fire_name,paste0(fire_name,"_drainage_prox_",buffer_inner,"-",buffer_outer,".shp")),
-              overwrite = overwrite)
+  print("      Removing areas near drainages...")
+  drainage_buffer <- erase(perimeter, drainage_buffer_inner)
+  if(save){
+    print("      Saving file...")
+    writeVector(drainage_buffer,
+                here(fire_name,paste0(fire_name,"_drainage_prox_",buffer_inner,".shp")),
+                overwrite = overwrite)
+  }
   return(drainage_buffer)
 }
 
@@ -157,12 +155,11 @@ for(fire_name in fires){
   # limit to within 800m of (but at least 200m from) a drainage
   print("   drainages")
   streams_clip <- clip_to_fire(all_streams, perimeter, EPSG)
-  drainage_zone <- drainage_proximity(fire_name, streams_clip, 800, 200, 5070)
-  drainage_zone <- vect(here(fire_name,paste0(fire_name,"_drainage_prox_200-800.shp")))
+  upslope_zone <- drainage_proximity(fire_name, perimeter, streams_clip, 200, 5070, save = T)
   # must be at least 500m from the edge of the fire perimeter
   print("   border")
   perimeter_buffer <- buffer(perimeter, -500)
-  drainages_fire <- clip_to_fire(drainage_zone, perimeter_buffer, EPSG)
+  drainages_fire <- clip_to_fire(upslope_zone, perimeter_buffer, EPSG)
   # slope must be at least 23 deg
   print("   slope")
   slope_23 <- slope_mask(fire_name)
@@ -179,7 +176,7 @@ for(fire_name in fires){
   sample_sites_spaced <- filter_distance(drainage_23_severe, size = 5, min_dist = 1000)
   if(nrow(sample_sites_spaced)==5){
     print("   write")
-    writeVector(sample_sites_spaced, here(fire_name,paste0(fire_name,"_sample_sites_NJT.shp")),overwrite=T)
+    writeVector(sample_sites_spaced, here(fire_name,paste0(fire_name,"_sample_sites_NEW.shp")),overwrite=T)
   } else{
     print("Not enough sample sites. Consider increasing spatSample size")
   }
