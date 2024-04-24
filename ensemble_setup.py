@@ -5,38 +5,37 @@ Created on Tue Oct 10 08:45:22 2023
 
 @author: ntutland
 """
-
+# Core imports
+from os import environ
 from pathlib import Path
 import math
-import pylab
-import zarr
-import json
-import subprocess
 from shutil import copy
+from datetime import datetime
+import subprocess
+from os import chdir
+from time import sleep
+
+# External imports
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import pylab
+import zarr
+import json
 from shapely import Polygon
 from meteostat import Point, Daily
-from time import sleep
-from datetime import datetime
-from TTRS_QUICFire_Support import plot_array
 from scipy.io import FortranFile
-from os import environ, chdir
 
 environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
 import fastfuels_sdk as fastfuels
 import quicfire_tools as qft
 
-# import r_funcs as r
-import sys
+# import sys
 
-sys.path.insert(
-    0, "/Users/ntutland/Documents/Projects/fastfuels-sdk-python/fastfuels_sdk"
-)
-import exports as exp
+# sys.path.insert(0, "/Users/ntutland/Documents/Projects/duet-tools/")
+import duet_tools as duet
 
 
 def main():
@@ -48,8 +47,11 @@ def main():
         geometry=gpd.points_from_xy(fire_df["X"], fire_df["Y"]),
         crs="EPSG:5070",
     )
+
+    conditions = [1.0, 0.05, 1.0]
+
     for i in range(len(fire_gdf.index)):
-        if i != 0: # Caldor-Camp2 is already done
+        if i == 6:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -57,36 +59,33 @@ def main():
             domain_size = 500
             og_path = HERE
 
+            print("\n", fire_name, "-", site_name, "\n")
             # prepare simulation
             qf_run = QuicfireRun(
-                fire_name, site_name, fire_date, site_coords, domain_size, og_path
+                fire_name,
+                site_name,
+                fire_date,
+                site_coords,
+                domain_size,
+                og_path,
+                conditions,
+                fastfuels_done=False,
+                duet_done=True,
             )
-
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
+            qf_run.modify_fuels()
+            # qf_run.correct_fuelheight()
             qf_run.get_ignition()
-            qf_run.draw_ignition()
             qf_run.run_duet()
-            # qf_run.query_dNBR()
+            qf_run.calibrate_duet()
+            qf_run.modify_fuels()
+            # qf_run.draw_ignition()
             qf_run.quicfire_simulation()
-
-    duet = _read_dat_file(
-        qf_run.site_path,
-        "surface_rhof.dat",
-        arr_dim=(2, qf_run.nx, qf_run.ny),
-        order="F",
-    )
-    plot_array(duet[0, :, :], 1, "duet", "")
-    cali = _read_dat_file(
-        qf_run.site_path,
-        "treesrhof.dat",
-        arr_dim=(qf_run.nz, qf_run.nx, qf_run.ny),
-        order="C",
-    )
-    plot_array(cali[0, :, :], 1, "duet", "")
 
 
 class QuicfireRun:
+
     def __init__(
         self,
         fire_name,
@@ -95,10 +94,11 @@ class QuicfireRun:
         site_coords,
         domain_size,
         og_path,
+        conditions,
         EPSG=5070,
         buffer=50,
         burnplot_done=False,
-        fastfuels_done=False,
+        fastfuels_done=True,
         duet_done=False,
         severity_done=False,
     ):
@@ -111,10 +111,11 @@ class QuicfireRun:
         self.domain_size = domain_size
         self.EPSG = EPSG
         self.buffer = buffer
+        self.conditions = conditions
         self.ignition_pace = 5
         # Paths
         self.fire_path = OG_PATH / fire_name
-        qf_name = "_".join([fire_name, site_name, str(domain_size) + "m"])
+        qf_name = "_".join([fire_name, site_name, "duet"])
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
         self.site_path = (
             OG_PATH / fire_name / "Sample_Sites" / site_name / (str(domain_size) + "m")
@@ -130,7 +131,8 @@ class QuicfireRun:
         self.duet_done = duet_done
         self.severity_done = severity_done
         # Calculated
-        self.wind_dir, self.wind_speed = self._meteostat()
+        self.wind_dir = None
+        self.wind_speed = 10
         self.ignition_coords = None
         self.fgrid_zarr = self._import_fgrid_zarr() if fastfuels_done else None
         self.nx = self.fgrid_zarr.attrs["nx"] if fastfuels_done else None
@@ -212,6 +214,15 @@ class QuicfireRun:
             # Copy the data from the immutable zarr store to the mutable zarr store
             zarr.copy_all(zroot, zarr_mutable)
 
+            fastfuels.export_zarr_to_quicfire(zroot, self.site_path)
+            self.nx = zroot.attrs["nx"]
+            self.ny = zroot.attrs["ny"]
+            self.nz = zroot.attrs["nz"]
+            self.fgrid_zarr = zarr_mutable
+
+            # Get new wind direction from the fastfuels topo file
+            self.new_wdir_from_topo()
+
             fastfuels.export_zarr_to_duet(
                 zroot,
                 self.site_path,
@@ -220,57 +231,59 @@ class QuicfireRun:
                 wind_var=360,
                 duration=5,
             )
-            fastfuels.export_zarr_to_quicfire(zroot, self.site_path)
 
             self.fastfuels_done = True
-            self.nx = zroot.attrs["nx"]
-            self.ny = zroot.attrs["ny"]
-            self.nz = zroot.attrs["nz"]
-            self.fgrid_zarr = zarr_mutable
+
         else:
             print(
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
             )
 
-    def get_ignition(self):
-        """
-        Generate an ignition line based on wind direction that resides outside of
-        the buffer zone and is perpendicular to the wind direction.
-        """
-        if not self.fastfuels_done:
-            raise Exception(
-                "get_ignition: FastFuels must be run before ignitions can be calculated"
-            )
-        # Get coordinates of buffer corner nearest to wind direction
-        if self.wind_dir < 90:
-            x1, y1 = (self.nx - self.buffer, self.ny - self.buffer)
-        elif self.wind_dir < 180:
-            x1, y1 = (self.nx - self.buffer, self.buffer)
-        elif self.wind_dir < 270:
-            x1, y1 = (self.buffer, self.buffer)
-        else:
-            x1, y1 = (self.buffer, self.ny - self.buffer)
+    def modify_fuels(self):
+        margins = _get_margin_indices((self.ny, self.nx), 25)
+        rhof = _read_dat_file(
+            self.site_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
+        )
+        height = _read_dat_file(
+            self.site_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
+        )
+        moist = _read_dat_file(
+            self.site_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
+        )
 
-        theta = (180 - self.wind_dir) % 180
-        m = math.tan(math.radians(theta))
+        # Modify fuels in margins
+        rhof[0, :, :][margins] = self.conditions[0]
+        moist[0, :, :][margins] = self.conditions[1]
+        height[0, :, :][margins] = self.conditions[2]
 
-        L = m * (-x1) + y1
-        T = (self.ny - y1) / m + x1 if m != 0 else float("inf")
-        R = m * (self.nx - x1) + y1
-        B = (-y1) / m + x1 if m != 0 else float("-inf")
+        # Modify canopy moisture
+        moist[1:, :, :][np.where(moist[1:, :, :] > 0)] = 0.1
+        # for z in range(1, moist.shape[0]):
+        #     moist_margins = moist[z, :, :][margins]
+        #     moist_margins[np.where(moist_margins > 0)] = 0.4
+        #     moist[z, :, :][margins] = moist_margins
 
-        intersections = ((0, L), (T, self.ny), (self.nx, R), (B, 0))
-        border_intersections = []
-        for j, k in intersections:
-            if 0 <= j <= self.nx and 0 <= k <= self.nx:
-                border_intersections.append((j, k))
+        # plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
+        # plot_array(moist[0, :, :], f"modified moisture {self.margins}")
+        # plot_array(height[0, :, :], f"modified height {self.margins}")
 
-        switched = [border_intersections[1], border_intersections[0]]
-        start = _percent_along_line(*border_intersections, perc=0.1)
-        end = _percent_along_line(*switched, perc=0.1)
+        # plot_array(
+        #     moist[1, :, :],
+        #     f"modified moisture {self.margins}",
+        # )
 
-        self.ignition_coords = [start, end]
-        self._write_ignite()
+        _write_array_to_dat(rhof, "treesrhof.dat", self.site_path, reshape=False)
+        _write_array_to_dat(moist, "treesmoist.dat", self.site_path, reshape=False)
+        _write_array_to_dat(height, "treesfueldepth.dat", self.site_path, reshape=False)
+
+    def correct_fuelheight(self):
+        """Corrects the treesfueldepth.dat file by filling all non-surface layers with 1's"""
+
+        height = _read_dat_file(
+            self.site_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
+        )
+        height[1:, :, :] = 1.0
+        _write_array_to_dat(height, "treesfueldepth.dat", self.site_path, reshape=False)
 
     def run_duet(self):
         if self.duet_done == False:
@@ -293,18 +306,65 @@ class QuicfireRun:
                 if process.poll() == 0:
                     print("DUET run successfully")
             chdir(self.OG_PATH)
-            self._calibrate_duet()
         else:
-            print(
-                "DUET has already been run and calibrated. To rerun, set self.duet_done to False"
-            )
+            print("DUET has already been run. To rerun, set self.duet_done to False")
 
-    # def query_dNBR(self):
-    #     if self.severity_done == False:
-    #         self._crop_severity()
-    #         # TODO: figure out alignment of dNBR and quicfire
-    #     else:
-    #         print("Fire severity already queried. To rerun, set self.severity_done to False")
+    def new_wdir_from_topo(self):
+        topo = _read_dat_file(
+            self.site_path,
+            "topo.dat",
+            arr_dim=(1, self.nx, self.ny),
+            order="C",
+        )
+        topo = topo[0, :, :]
+        lowpoint = np.where(topo == np.min(topo))
+        low_coords = (lowpoint[1][0], lowpoint[0][0])
+        center_coords = (self.nx / 2, self.ny / 2)
+        new_wdir = _calculate_angle(
+            low_coords[0], low_coords[1], center_coords[0], center_coords[1]
+        )
+        self.wind_dir = int(round(new_wdir))
+        # plot_array(topo, f"{self.site_name} topo")
+
+    def get_ignition(self):
+        """
+        Generate an ignition line based on wind direction that resides outside of
+        the buffer zone and is perpendicular to the wind direction.
+        """
+        if not self.fastfuels_done:
+            raise Exception(
+                "get_ignition: FastFuels must be run before ignitions can be calculated"
+            )
+        # Get coordinates of buffer corner nearest to wind direction
+        if self.wind_dir < 90:
+            x1, y1 = (self.nx * 2 - self.buffer, self.ny * 2 - self.buffer)
+        elif self.wind_dir < 180:
+            x1, y1 = (self.nx * 2 - self.buffer, self.buffer)
+        elif self.wind_dir < 270:
+            x1, y1 = (self.buffer, self.buffer)
+        else:
+            x1, y1 = (self.buffer, self.ny * 2 - self.buffer)
+
+        theta = (180 - self.wind_dir) % 180
+        m = math.tan(math.radians(theta))
+
+        L = m * (-x1) + y1
+        T = (self.ny * 2 - y1) / m + x1 if m != 0 else float("inf")
+        R = m * (self.nx * 2 - x1) + y1
+        B = (-y1) / m + x1 if m != 0 else float("-inf")
+
+        intersections = ((0, L), (T, self.ny * 2), (self.nx * 2, R), (B, 0))
+        border_intersections = []
+        for j, k in intersections:
+            if 0 <= j <= self.nx * 2 and 0 <= k <= self.nx * 2:
+                border_intersections.append((j, k))
+
+        switched = [border_intersections[1], border_intersections[0]]
+        start = _percent_along_line(*border_intersections, perc=0.1)
+        end = _percent_along_line(*switched, perc=0.1)
+
+        self.ignition_coords = [start, end]
+        self._write_ignite()
 
     def draw_ignition(self):
         """
@@ -321,14 +381,18 @@ class QuicfireRun:
             )
         start_loc, end_loc = self.ignition_coords
         fig, ax = plt.subplots()
-        plt.plot([start_loc[0], end_loc[0]], [start_loc[1], end_loc[1]], "ro-")
+        plt.plot(
+            [start_loc[0] / 2, end_loc[0] / 2],
+            [start_loc[1] / 2, end_loc[1] / 2],
+            "ro-",
+        )
         plt.xlim(0, self.nx)
         plt.ylim(0, self.ny)
         ax.set_aspect("equal")
         rect = patches.Rectangle(
-            (self.buffer, self.buffer),
-            self.nx - (2 * self.buffer),
-            self.ny - (2 * self.buffer),
+            (self.buffer / 2, self.buffer / 2),
+            self.nx - (self.buffer),
+            self.ny - (self.buffer),
             linewidth=1,
             edgecolor="black",
             facecolor="none",
@@ -344,23 +408,32 @@ class QuicfireRun:
             fire_nz=self.nz,
             wind_speed=self.wind_speed,
             wind_direction=self.wind_dir,
-            simulation_time=3600,
+            simulation_time=7200,
         )
         sim.set_custom_simulation()
-        sim.quic_fire.fuel_flag = 4
+        sim.set_output_files(
+            react_rate=True,
+            fuel_dens=True,
+            fuel_moist=True,
+            mass_burnt=True,
+            radiation=True,
+            surf_eng=True,
+        )
+        sim.quic_fire.fuel_density_flag = 4
+        sim.quic_fire.fuel_moisture_flag = 4
+        sim.quic_fire.ignitions_per_cell = 5
         sim.quic_fire.auto_kill = 1
+        sim.qu_simparams.quic_domain_height = 1800
 
         # assemble ensemble
         self.qf_path.mkdir(exist_ok=True)
-        sim.write_inputs(self.qf_path)
+        sim.to_json(self.qf_path / f"{self.site_name}.json")
 
         # copy dat files and exe
         # dat files
         dat_files = [
             "ignite.dat",
-            "treesrhof.dat",
-            "treesmoist.dat",
-            "treesfueldepth.dat",
+            "topo.dat",
         ]
         for file in dat_files:
             src = self.site_path / file
@@ -368,30 +441,19 @@ class QuicfireRun:
             copy(src, dst)
         # exe
         exe_src = Path(
-            "/Users/ntutland/Documents/Quicfire/QF_5.3.1/exe/quicfire_MACI.exe"
+            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/exe/quicfire_MACI.exe"
         )
         exe_dst = self.qf_path / "quicfire_MACI.exe"
         copy(exe_src, exe_dst)
         # drawfire
-        drawfire = [
-            "class_def.py",
-            "drawfire.py",
-            "fuel_voxels.py",
-            "gen_images.py",
-            "misc.py",
-            "PyVistaQF.py",
-            "PyVistaQF_NJT.py",
-            "PyVistaQF_example.inp",
-            "quicfire_vis.py",
-            "read_inputs.py",
-        ]
+        drawfire_dir = Path(
+            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3/quicfire_vis"
+        )
+        drawfire = []
+        for file in drawfire_dir.iterdir():
+            drawfire.append(file.name)
         for file in drawfire:
-            src = (
-                Path(
-                    "/Users/ntutland/Documents/Quicfire/QF_5.3.1/scripts/postprocessing/python3"
-                )
-                / file
-            )
+            src = drawfire_dir / file
             dst = self.qf_path / file
             copy(src, dst)
 
@@ -417,7 +479,7 @@ class QuicfireRun:
             file.write("/\n")
             file.write(
                 "{} {} {} {} {} {}\n".format(
-                    start_loc[0], end_loc[0], start_loc[1], end_loc[1], 0, duration
+                    start_loc[0], start_loc[1], end_loc[0], end_loc[1], 0, duration
                 )
             )
         print("ignite.dat written to {}".format(self.qf_path))
@@ -433,42 +495,89 @@ class QuicfireRun:
                 )
             copy(src, dst)
 
-    def _calibrate_duet(self):
-        # Calibrate duet
-        print("Calibrating DUET to SB40 fuel loading values")
-        param_path = self.OG_PATH / "sb40_parameters.csv"
-        if not param_path.exists():
-            raise FileNotFoundError(
-                "run_duet: file sb40_parameters.csv not found in base directory"
+    def calibrate_duet(self):
+        xmin, xmax, ymin, ymax = (
+            self.fgrid_zarr.attrs["xmin"],
+            self.fgrid_zarr.attrs["xmax"],
+            self.fgrid_zarr.attrs["ymin"],
+            self.fgrid_zarr.attrs["ymax"],
+        )
+        pad = 30 / 2
+        xmin, xmax, ymin, ymax = xmin - pad, xmax + pad, ymin - pad, ymax + pad
+        bbox = Polygon(
+            [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)]
+        )
+
+        duet_run = duet.import_duet(self.site_path, self.nx, self.ny)
+        duet_run.add_moisture_array(duet_run.density)
+        print(self.qf_path)
+        query = duet.query_landfire(
+            area_of_interest=bbox, directory=self.site_path, input_epsg=5070
+        )
+        # quick fix for weird duet grass height array
+        for z in [0, 1]:
+            if np.max(duet_run.height[z, :, :]) == np.min(
+                duet_run.height[z, :, :][duet_run.height[z, :, :] > 0]
+            ):
+                duet_run.height[z, :, :] = duet_run.density[z, :, :]
+        try:
+            grass_density = duet.assign_targets_from_sb40(query, "grass", "density")
+            grass_height = duet.assign_targets_from_sb40(query, "grass", "height")
+            grass_moisture = duet.assign_targets_from_sb40(query, "grass", "moisture")
+            density_targets = duet.set_density(grass=grass_density)
+            height_targets = duet.set_height(grass=grass_height)
+            moisture_targets = duet.set_moisture(grass=grass_moisture)
+            calibrated_grass = duet.calibrate(
+                duet_run, [density_targets, height_targets, moisture_targets]
             )
-        dc = exp.DuetCalibrator(self.fgrid_zarr, self.site_path, self.OG_PATH)
-        dc.calibrate_with_sb40(["grass", "litter"])
-        dc.to_file()
-        dc.replace_quicfire_surface_fuels()
+        except ValueError:
+            print("No grass at sample site. Continuing with litter only.")
+            calibrated_grass = duet_run
+            pass
+        try:
+            litter_density = duet.assign_targets_from_sb40(query, "litter", "density")
+            litter_height = duet.assign_targets_from_sb40(query, "litter", "height")
+            litter_moisture = duet.assign_targets_from_sb40(query, "litter", "moisture")
+            density_targets = duet.set_density(litter=litter_density)
+            height_targets = duet.set_height(litter=litter_height)
+            moisture_targets = duet.set_moisture(litter=litter_moisture)
+            calibrated_litter = duet.calibrate(
+                calibrated_grass, [density_targets, height_targets, moisture_targets]
+            )
+        except ValueError:
+            print("No litter at sample site. Continuing with grass only.")
+            calibrated_litter = calibrated_grass
+            pass
+
+        duet_density = calibrated_litter.to_numpy("integrated", "density")
+        duet_height = calibrated_litter.to_numpy("integrated", "height")
+        duet_moisture = calibrated_litter.to_numpy("integrated", "moisture")
+
+        treesrhof = _read_dat_file(
+            self.site_path, "treesrhof.dat", arr_dim=(self.nz, self.ny, self.nx)
+        )
+        treesfueldepth = _read_dat_file(
+            self.site_path, "treesfueldepth.dat", arr_dim=(self.nz, self.ny, self.nx)
+        )
+        treesmoist = _read_dat_file(
+            self.site_path, "treesmoist.dat", arr_dim=(self.nz, self.ny, self.nx)
+        )
+        # plot_array(treesrhof[0, :, :], "treesrhof fastfuels")
+        # plot_array(duet_density, "calibrated rhof")
+        treesrhof[0, :, :] = duet_density
+        treesfueldepth[0, :, :] = duet_height
+        treesmoist[0, :, :] = duet_moisture
+        # plot_array(treesrhof[0, :, :], "treeshrhof calibrated")
+
+        _write_array_to_dat(treesrhof, "treesrhof.dat", self.qf_path, reshape=False)
+        _write_array_to_dat(
+            treesfueldepth, "treesfueldepth.dat", self.qf_path, reshape=False
+        )
+        _write_array_to_dat(treesmoist, "treesmoist.dat", self.qf_path, reshape=False)
         self.duet_done = True
 
-    # def _crop_severity(self):
-    #     xmin = self.fgrid_zarr.attrs['xmin']
-    #     xmax = self.fgrid_zarr.attrs['xmax']
-    #     ymin = self.fgrid_zarr.attrs['ymin']
-    #     ymax = self.fgrid_zarr.attrs['ymax']
-    #     pad = 30/2
-    #     xmin,xmax,ymin,ymax = xmin+pad, xmax-pad, ymin+pad, ymax-pad
-    #     bbox = Polygon([(xmin,ymin),
-    #                     (xmax,ymin),
-    #                     (xmax,ymax),
-    #                     (xmin,ymax),
-    #                     (xmin,ymin)])
-    #     severity_path = self.fire_path / self.dnbr_name
-    #     shp_name = "_".join([self.site_name,str(self.domain_size),"dNBR.shp"])
-    #     rst_name = "_".join([self.site_name,str(self.domain_size),"dNBR.tif"])
-    #     shp_path = self.site_path / shp_name
-    #     out_path = self.site_path / rst_name
-    #     gpd.GeoDataFrame(index=[0], geometry=[bbox], crs='epsg:{}'.format(self.EPSG)).to_file(shp_path)
-    #     r.terra_crop(severity_path, shp_path, out_path)
-
     def _import_fgrid_zarr(self):
-        zarr_path = self.qf_path / self.mutable_name
+        zarr_path = self.site_path / self.mutable_name
         zroot = zarr.open(zarr_path, mode="r")
         return zroot
 
@@ -478,8 +587,15 @@ class QuicfireRun:
         center = sample_sites[
             sample_sites["Site_Name"] == self.site_name
         ].centroid.to_crs(4326)
+        id = sample_sites.index[sample_sites["Site_Name"] == self.site_name].tolist()[0]
+        plot = Point(center[id].y, center[id].x)
+        plot.radius = 60000
 
-        plot = Point(center[0].y, center[0].x)
+        # from meteostat import Stations
+        # stations = Stations()
+        # stations = stations.nearby(center[id].y, center[id].x)
+        # station = stations.fetch(1)
+        # print(station)
 
         # Set time period
         start = datetime.strptime(self.fire_date, "%Y-%m-%d")
@@ -489,7 +605,7 @@ class QuicfireRun:
         data = Daily(plot, start, end)
         data = data.fetch()
 
-        return (data.wdir[0], data.wspd[0])
+        return data.wspd[0]
 
     def _make_bbox(self, dim):
         dim = dim / 2
@@ -531,7 +647,7 @@ class QuicfireRun:
 
 def _read_dat_file(
     dire: Path, filename: str, arr_dim: tuple, order: str = "C"
-) -> np.array:
+) -> np.ndarray:
     """
     Read in a .dat file as a numpy array.
 
@@ -544,6 +660,32 @@ def _read_dat_file(
         arr = FortranFile(fin).read_reals(dtype="float32").reshape(arr_dim, order=order)
 
     return arr
+
+
+def _write_array_to_dat(
+    array: np.ndarray,
+    dat_name: str,
+    output_dir: Path,
+    dtype: type = np.float32,
+    reshape: bool = True,
+) -> None:
+    """
+    Write a numpy array to a fortran binary file. Array must be cast to the
+    appropriate data type before calling this function. If the array is 3D,
+    the array will be reshaped from (y, x, z) to (z, y, x) for fortran.
+    """
+    # Reshape array from (y, x, z) to (z, y, x) (also for fortran)
+    if reshape:
+        if len(array.shape) == 3:
+            array = np.moveaxis(array, 2, 0).astype(dtype)
+        else:
+            array = array.astype(dtype)
+    else:
+        array = array.astype(dtype)
+
+    # Write the zarr array to a dat file with scipy FortranFile package
+    with FortranFile(Path(output_dir, dat_name), "w") as f:
+        f.write_record(array)
 
 
 def _ignition_duration(start, end, pace):
@@ -572,6 +714,45 @@ def _pol2cart(rho, phi):
     x = -rho * np.sin(np.radians(phi))
     y = -rho * np.cos(np.radians(phi))
     return (x, y)
+
+
+def _calculate_angle(x1, y1, x2, y2):
+    dx = x1 - x2
+    dy = y1 - y2
+    angle_radians = math.atan2(dx, dy)
+    angle_degrees = math.degrees(angle_radians)
+    angle_degrees %= 360
+    return angle_degrees
+
+
+def _get_margin_indices(array_size, margin_width):
+
+    # Generate row and column indices for the array
+    rows, cols = np.indices(array_size)
+
+    # Create margins directly using np.logical_or to identify margins
+    margins = np.logical_or.reduce(
+        (
+            rows < margin_width,
+            rows >= array_size[0] - margin_width,
+            cols < margin_width,
+            cols >= array_size[1] - margin_width,
+        )
+    )
+
+    # Find the indices of the margins using np.where()
+    result_margins = np.where(margins)
+
+    return result_margins
+
+
+def plot_array(x, title):
+    plt.figure(2)
+    plt.set_cmap("viridis")
+    plt.imshow(x, origin="lower")
+    plt.colorbar()
+    plt.title(title, fontsize=18)
+    plt.show()
 
 
 if __name__ == "__main__":

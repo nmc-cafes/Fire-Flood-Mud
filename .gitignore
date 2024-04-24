@@ -1,0 +1,29 @@
+## Ignore everything
+*
+
+## Except
+!.gitignore
+# File types
+!*.py
+!*.R
+!*.txt
+!*.csv
+!*.yml
+!*.code-workspace
+!*.Rproj
+
+# Descend into directories
+!Duet/
+!Dixie/
+!Caldor/
+!KNP/
+KNP/allplotarchiveout.csv
+
+# Individual files
+!sb40_parameters.csv
+!Sample_Sites.csv
+
+# Ignore for sure
+.Rhistory
+.Rproj.user
+.DS_Store
