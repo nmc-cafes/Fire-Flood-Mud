@@ -56,6 +56,6 @@ for(i in 1:length(fires)){
 }
 fire_dates <- bind_rows(dfs)
 
-final_df <- left_join(sample_sites_df,fire_dates,by=c("Fire_Name","Site_Name"))
+final_df <- left_join(sample_sites_df,fire_dates,by=c("Fire_Name","Site_Name","Severity_Class"))
 
 write.csv(final_df, here("Sample_Sites_NEW.csv"), row.names=F)

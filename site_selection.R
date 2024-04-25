@@ -211,6 +211,7 @@ for(fire_name in fires){
   moderate_severity <- severity_rcl(mod_sev_pct, threshold=0.5)
   low_severity <- severity_rcl(low_sev_pct, threshold=0.5)
   severity_stack <- c(high_severity,moderate_severity,low_severity)
+  writeRaster(severity_stack, here(fire_name, "Severity_Class_510m.tif"))
   # combine all 4 criteria
   print("   combine")
   upslope_23 <- clip_to_fire(slope_23, upslope_fire, EPSG)
