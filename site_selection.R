@@ -125,14 +125,16 @@ sample_stratified <- function(rst_stk, size){
   }
   size_strat <- size/3
   high_sev <- filter_distance(rst_stk["high"], size = size_strat, min_dist = 1000)
+  high_sev$severity <- "high"
   mod_sev <- filter_distance(rst_stk["moderate"], size = size_strat, min_dist = 1000)
+  mod_sev$severity <- "moderate"
   low_sev <- filter_distance(rst_stk["low"], size = size_strat, min_dist = 1000)
+  low_sev$severity <- "low"
   sample_sites <- rbind(high_sev,mod_sev,low_sev)
   return(sample_sites)
 }
 
 EPSG <- 5070
-all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
 
 ## Process fire perimeters 
 # ca_fires <- c("DIXIE","CALDOR","KNP COMPLEX")
@@ -185,6 +187,7 @@ if(DEM_DONE == FALSE){
 }
 
 ## Select Sites
+all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
 for(fire_name in fires){
   print(fire_name)
   perimeter <- vect(here(fire_name,paste0(fire_name,"_perimeter.shp")))
@@ -217,6 +220,10 @@ for(fire_name in fires){
   print("   sample")
   size <- 15
   sample_sites <- sample_stratified(upslope_23_severity, size)
+  sample_sites$site_name <- NA
+  for(i in 1:length(sample_sites)){
+    sample_sites$site_name[i] <- paste0(fire_name,i)
+  }
   if(nrow(sample_sites)==size){
     print("   write")
     writeVector(sample_sites, here(fire_name,paste0(fire_name,"_sample_sites_NEW.shp")),overwrite=T)
