@@ -14,6 +14,7 @@ from datetime import datetime
 import subprocess
 from os import chdir
 from time import sleep
+from sys import exit
 
 # External imports
 import numpy as np
@@ -40,7 +41,7 @@ import duet_tools as duet
 
 def main():
     HERE = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud")
-    sites_path = HERE / "Sample_sites_NJT.csv"
+    sites_path = HERE / "Sample_sites_NEW.csv"
     fire_df = pd.read_csv(sites_path)
     fire_gdf = gpd.GeoDataFrame(
         fire_df,
@@ -51,12 +52,11 @@ def main():
     conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i == 6:
+        if i >= 0:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
             site_coords = fire_gdf.iloc[i]["geometry"]
-            domain_size = 500
             og_path = HERE
 
             print("\n", fire_name, "-", site_name, "\n")
@@ -66,11 +66,10 @@ def main():
                 site_name,
                 fire_date,
                 site_coords,
-                domain_size,
                 og_path,
                 conditions,
                 fastfuels_done=False,
-                duet_done=True,
+                duet_done=False,
             )
             qf_run.create_burnplot()
             qf_run.run_fastfuels()
@@ -92,13 +91,12 @@ class QuicfireRun:
         site_name,
         fire_date,
         site_coords,
-        domain_size,
         og_path,
         conditions,
         EPSG=5070,
         buffer=50,
         burnplot_done=False,
-        fastfuels_done=True,
+        fastfuels_done=False,
         duet_done=False,
         severity_done=False,
     ):
@@ -108,7 +106,6 @@ class QuicfireRun:
         self.site_name = site_name
         self.fire_date = fire_date
         self.site_coords = site_coords
-        self.domain_size = domain_size
         self.EPSG = EPSG
         self.buffer = buffer
         self.conditions = conditions
@@ -117,11 +114,9 @@ class QuicfireRun:
         self.fire_path = OG_PATH / fire_name
         qf_name = "_".join([fire_name, site_name, "duet"])
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
-        self.site_path = (
-            OG_PATH / fire_name / "Sample_Sites" / site_name / (str(domain_size) + "m")
-        )
+        self.site_path = OG_PATH / fire_name / "Sample_Sites" / site_name
         # Filenames
-        self.shp_name = self.site_name + "_bounds_" + str(self.domain_size) + "m.shp"
+        self.shp_name = self.site_name + "_bounds_500m.shp"
         self.fgrid_name = self.site_name + "_fuelgrid.zip"
         self.mutable_name = self.site_name + "_fastfuels.zarr"
         self.dnbr_name = self.fire_name + "_dNBR.tif"
@@ -147,7 +142,7 @@ class QuicfireRun:
 
     def create_burnplot(self):
         if self.burnplot_done == False:
-            full_size = self.domain_size + (2 * self.buffer)
+            full_size = 500 + (2 * self.buffer)
             site_poly = self._make_bbox(full_size)
 
             site_bounds = gpd.GeoDataFrame(site_poly)
@@ -300,11 +295,15 @@ class QuicfireRun:
                 def poll_and_read():
                     print(f"{process.stdout.read1().decode('utf-8')}")
 
-                while process.poll() != 0:
+                while process.poll() not in [0, -10, -11]:
                     poll_and_read()
+                    print(f"{process.poll()}")
                     sleep(1)
-                if process.poll() == 0:
-                    print("DUET run successfully")
+                if process.poll() in [0, -10, -11]:
+                    print(f"DUET run successfully (Exit poll: {process.poll()})")
+                else:
+                    print(f"Error: Poll = {process.poll()}")
+                    exit(47)
             chdir(self.OG_PATH)
         else:
             print("DUET has already been run. To rerun, set self.duet_done to False")

@@ -59,7 +59,7 @@ site_selection <- ggplot() +
   geom_spatvector(data = low_out, color = NA, fill=blue, alpha = 0.25) +
   geom_spatvector(data = mod_out, color = NA, fill=orange, alpha = 0.25) +
   geom_spatvector(data = high_out, color = NA, fill="purple4", alpha = 0.25) +
-  geom_spatvector(data = streams, color = "blue", linetype = "dashed") +
+  geom_spatvector(data = streams, color = "blue") +
   geom_spatvector(data = sites, pch = 22, fill = yellow, color = "black", size = 3) +
   labs(title = "Cedar Creek (WA)") +
   theme_bw() +
