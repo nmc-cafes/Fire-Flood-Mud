@@ -45,10 +45,14 @@ def get_surface_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = 
     dens_init = dens.to_numpy(timestep=0)
     dens_final = dens.to_numpy(len(dens.times) - 1)
     fuel_present = np.where(dens_init[0, 0, :, :] > 0)
+    surface_consumption_pct = np.zeros((np.shape(dens_init[0, 0, :, :])))
+    surface_consumption_pct[fuel_present] = (
+        dens_init[0, 0, :, :][fuel_present] - dens_final[0, 0, :, :][fuel_present]
+    ) / dens_init[0, 0, :, :][fuel_present]
     surface_consumption = np.zeros((np.shape(dens_init[0, 0, :, :])))
     surface_consumption[fuel_present] = (
         dens_init[0, 0, :, :][fuel_present] - dens_final[0, 0, :, :][fuel_present]
-    ) / dens_init[0, 0, :, :][fuel_present]
+    )
     surface_remaining = np.zeros((np.shape(dens_init[0, 0, :, :])))
     surface_remaining[fuel_present] = 1 - (
         (dens_init[0, 0, :, :][fuel_present] - dens_final[0, 0, :, :][fuel_present])
@@ -58,11 +62,12 @@ def get_surface_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = 
         # print(np.min(dens_init[0, 0, :, :][dens_init[0, 0, :, :] > 0]))
         # plot_array(dens_init[0, 0, :, :], "initial surface fuel density")
         # plot_array(dens_final[0, 0, :, :], "final surface fuel density")
-        plot_array(surface_consumption, "surface fuel consumption percent")
+        plot_array(surface_consumption_pct, "surface fuel consumption percent")
         # plot_array(surface_remaining, "surface fuel percent remaining")
-    np.savetxt(arrpath / "surface_consumption.txt", surface_consumption)
-    np.savetxt(arrpath / "surface_remaining.txt", surface_remaining)
-    return surface_consumption
+    np.savetxt(arrpath / "surface_consumption_pct.txt", surface_consumption_pct)
+    np.savetxt(arrpath / "surface_remaining_pct.txt", surface_remaining)
+    np.savetxt(arrpath / "surface_consumption", surface_consumption)
+    return surface_consumption_pct
 
 
 def get_canopy_consumption(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
