@@ -1,5 +1,6 @@
 from pathlib import Path
 from quicfire_tools import SimulationInputs
+from shutil import copy
 
 qf_dir = Path(__file__).parent / "QF_runs" / "Expanded_Sampling"
 
@@ -13,6 +14,13 @@ qf_dir = Path(__file__).parent / "QF_runs" / "Expanded_Sampling"
 
 fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 ensemble_dir = Path(__file__).parent / "QF_runs" / "Expanded_Sampling"
+qf_path = (
+    Path(__file__).parent.parent.parent
+    / "Quicfire"
+    / "QF_6.0.0"
+    / "exe"
+    / "quicfire_LIN64.exe"
+)
 
 for fire in fires:
     sites = [f"{fire}{i}" for i in range(1, 16)]
@@ -22,3 +30,7 @@ for fire in fires:
         json_path = run_path / f"{site}.json"
         sim = SimulationInputs.from_json(json_path)
         sim.write_inputs(run_path)
+        dst = run_path / "quicfire_LIN64.exe"
+        copy(qf_path, dst)
+        mac_path = run_path / "quicfire_MACI.exe"
+        mac_path.unlink(missing_ok=True)
