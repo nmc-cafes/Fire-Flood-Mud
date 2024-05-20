@@ -74,6 +74,20 @@ severity_rcl <- function(rst, threshold){
   return(rst_cls)
 }
 
+stratify_severity <- function(fire_name, perimeter_buffer, threshold, epsg, write=NULL){
+  high_sev_pct <- severity_pct(fire_name, perimeter_buffer, "high", epsg)
+  mod_sev_pct <- severity_pct(fire_name, perimeter_buffer, "moderate", epsg)
+  low_sev_pct <- severity_pct(fire_name, perimeter_buffer, "low", epsg)
+  high_severity <- severity_rcl(high_sev_pct, threshold)
+  moderate_severity <- severity_rcl(mod_sev_pct, threshold)
+  low_severity <- severity_rcl(low_sev_pct, threshold)
+  severity_stack <- c(high_severity,moderate_severity,low_severity)
+  if(!is.null(write)){
+    writeRaster(severity_stack, here(fire_name, write), overwrite=T)
+  }
+  return(severity_stack)
+}
+
 filter_distance <- function(raster, size, min_dist, max_iters=1e6){
   reso <- res(raster)[1]
   CRS <- crs(raster)
@@ -204,14 +218,7 @@ for(fire_name in fires){
   slope_23 <- slope_mask(fire_name)
   # stratify across severity
   print("   severity")
-  high_sev_pct <- severity_pct(fire_name, perimeter_buffer, "high", EPSG)
-  mod_sev_pct <- severity_pct(fire_name, perimeter_buffer, "moderate", EPSG)
-  low_sev_pct <- severity_pct(fire_name, perimeter_buffer, "low", EPSG)
-  high_severity <- severity_rcl(high_sev_pct, threshold=0.5)
-  moderate_severity <- severity_rcl(mod_sev_pct, threshold=0.5)
-  low_severity <- severity_rcl(low_sev_pct, threshold=0.5)
-  severity_stack <- c(high_severity,moderate_severity,low_severity)
-  writeRaster(severity_stack, here(fire_name, "Severity_Class_510m.tif"))
+  severity_stack <- stratify_severity(fire_name, perimeter_buffer, epsg=EPSG, threshold)
   # combine all 4 criteria
   print("   combine")
   upslope_23 <- clip_to_fire(slope_23, upslope_fire, EPSG)
