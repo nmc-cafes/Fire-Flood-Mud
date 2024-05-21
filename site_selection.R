@@ -11,15 +11,40 @@ clip_to_fire <- function(x, perimeter, EPSG){
   return(x_mask)
 }
 
-slope_mask <- function(fire_name){
+percent_rcl <- function(rst, threshold){
+  rcl_mat <- matrix(c(0,threshold,NA,
+                      threshold,1.0,1),
+                    nrow=2,
+                    byrow=T)
+  rst_cls <- classify(rst, rcl_mat, include.lowest=T)
+  return(rst_cls)
+}
+
+slope_pct <- function(slope, steep_degrees){
+  rcl_mat = matrix(c(0,steep_degrees,0,
+                     steep_degrees, Inf, 1),
+                   nrow=2, byrow=T)
+  slope_classify <- classify(slope, rcl_mat, right=NA)
+  steep_pct <- focal(slope_classify, w=17, fun = "mean", na.policy = "omit", na.rm=T)
+  return(steep_pct)
+}
+
+stratify_slope <- function(fire_name, steep_degrees, threshold, write=NULL){
   DEM <- rast(here(fire_name,paste0(fire_name,"_DEM.tif")))
   slope <- terrain(DEM, v="slope", neighbors=8, unit="degrees")
-  rcl_mat <- matrix(c(0,23,NA,
-                      23, Inf, 1),
-                    nrow = 2,
-                    byrow =  T)
-  slope_rcl <- classify(slope, rcl_mat, right = F)
-  return(slope_rcl)
+  steep_pct <- slope_pct(slope, 23)
+  steep_slope <- classify(steep_pct, 
+                          rcl = matrix(c(0,threshold,NA,threshold,1,1),nrow=2,byrow=T),
+                          include.lowest=T)
+  shallow_slope <- classify(steep_pct, 
+                            rcl = matrix(c(0,threshold,1,threshold,1,NA),nrow=2,byrow=T),
+                            include.lowest=T)
+  slope_stack <- c(steep_slope, shallow_slope)
+  names(slope_stack) <- c("steep","shallow")
+  if(!is.null(write)){
+    writeRaster(slope_stack, here(fire_name, write), overwrite=T)
+  }
+  return(slope_stack)
 }
 
 drainage_proximity <- function(fire_name, fire_perimeter, streams, buffer_inner, EPSG, save = F, overwrite = T){
@@ -65,22 +90,13 @@ severity_pct <- function(fire_name, perimeter, severity_class, EPSG){
   return(sev_pct)
 }
 
-severity_rcl <- function(rst, threshold){
-  rcl_mat <- matrix(c(0,threshold,NA,
-                      threshold,1.0,1),
-                    nrow=2,
-                    byrow=T)
-  rst_cls <- classify(rst, rcl_mat, include.lowest=T)
-  return(rst_cls)
-}
-
 stratify_severity <- function(fire_name, perimeter_buffer, threshold, epsg, write=NULL){
   high_sev_pct <- severity_pct(fire_name, perimeter_buffer, "high", epsg)
   mod_sev_pct <- severity_pct(fire_name, perimeter_buffer, "moderate", epsg)
   low_sev_pct <- severity_pct(fire_name, perimeter_buffer, "low", epsg)
-  high_severity <- severity_rcl(high_sev_pct, threshold)
-  moderate_severity <- severity_rcl(mod_sev_pct, threshold)
-  low_severity <- severity_rcl(low_sev_pct, threshold)
+  high_severity <- percent_rcl(high_sev_pct, threshold)
+  moderate_severity <- percent_rcl(mod_sev_pct, threshold)
+  low_severity <- percent_rcl(low_sev_pct, threshold)
   severity_stack <- c(high_severity,moderate_severity,low_severity)
   if(!is.null(write)){
     writeRaster(severity_stack, here(fire_name, write), overwrite=T)
@@ -134,17 +150,26 @@ filter_distance <- function(raster, size, min_dist, max_iters=1e6){
 }
 
 sample_stratified <- function(rst_stk, size){
-  if(size%%3!=0){
-    stop("size must be divisible by 3")
+  if(size%%6!=0){
+    stop("size must be divisible by 6")
   }
-  size_strat <- size/3
-  high_sev <- filter_distance(rst_stk["high"], size = size_strat, min_dist = 1000)
-  high_sev$severity <- "high"
-  mod_sev <- filter_distance(rst_stk["moderate"], size = size_strat, min_dist = 1000)
-  mod_sev$severity <- "moderate"
-  low_sev <- filter_distance(rst_stk["low"], size = size_strat, min_dist = 1000)
-  low_sev$severity <- "low"
-  sample_sites <- rbind(high_sev,mod_sev,low_sev)
+  size_strat <- size/6
+  j <- 1
+  for(sev in c("high","moderate","low")){
+    for(slope in c("steep","shallow")){
+      layer <- paste(sev,slope,sep="-")
+      sites <- filter_distance(rst_stk[layer], size=size_strat, min_dist=1000)
+      sites$severity=sev
+      sites$slope=slope
+      if(j==1){
+        sample_sites <- sites
+      } else{
+        sample_sites <- rbind(sample_sites, sites)
+      }
+      j <- j+1
+    }
+  }
+
   return(sample_sites)
 }
 
@@ -215,26 +240,30 @@ for(fire_name in fires){
   upslope_fire <- clip_to_fire(upslope_zone, perimeter_buffer, EPSG)
   # slope must be at least 23 deg
   print("   slope")
-  slope_23 <- slope_mask(fire_name)
+  slope_stack <- stratify_slope(fire_name, steep_degrees = 23, threshold = 0.5, write = "slope_stratified_510m.tif")
   # stratify across severity
   print("   severity")
-  severity_stack <- stratify_severity(fire_name, perimeter_buffer, epsg=EPSG, threshold)
+  severity_stack <- stratify_severity(fire_name, perimeter_buffer, epsg=EPSG, threshold = 0.5)
   # combine all 4 criteria
   print("   combine")
-  upslope_23 <- clip_to_fire(slope_23, upslope_fire, EPSG)
-  upslope_23_project <- project(upslope_23, severity_stack, method = "near")
-  upslope_23_severity <- severity_stack * upslope_23_project
+  upslope <- clip_to_fire(slope_stack, upslope_fire, EPSG)
+  upslope_project <- project(upslope, severity_stack, method = "near")
+  steep_severity <- severity_stack * upslope_project$steep
+  names(steep_severity) <- c("high-steep","moderate-steep","low-steep")
+  shallow_severity <- severity_stack * upslope_project$shallow
+  names(shallow_severity) <- c("high-shallow","moderate-shallow","low-shallow")
+  upslope_severity <- c(steep_severity,shallow_severity)
   # randomly sample sites, making sure they are at least 1km apart
   print("   sample")
-  size <- 15
-  sample_sites <- sample_stratified(upslope_23_severity, size)
+  size <- 18
+  sample_sites <- sample_stratified(upslope_severity, size)
   sample_sites$site_name <- NA
   for(i in 1:length(sample_sites)){
     sample_sites$site_name[i] <- paste0(fire_name,i)
   }
   if(nrow(sample_sites)==size){
     print("   write")
-    writeVector(sample_sites, here(fire_name,paste0(fire_name,"_sample_sites_NEW.shp")),overwrite=T)
+    writeVector(sample_sites, here(fire_name,paste0(fire_name,"_sample_sites_NEW2.shp")),overwrite=T)
   } else{
     print("Not enough sample sites. Consider increasing spatSample size")
   }

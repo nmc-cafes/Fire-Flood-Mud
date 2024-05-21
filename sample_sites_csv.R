@@ -8,7 +8,7 @@ states <- data.frame("state"=c(rep("CA",3),rep("WA",2)),
                      "fire"=fires)
 fire_list <- list()
 for(i in 1:length(fires)){
-  sites <- read_sf(here(fires[i],paste0(fires[i],"_sample_sites_NEW.shp")))
+  sites <- read_sf(here(fires[i],paste0(fires[i],"_sample_sites_NEW2.shp")))
   sites$Fire_Name <- fires[i]
   sites$Fire_State <- states[states$fire==fires[i],]$state
   fire_list[[i]] <- sites
@@ -23,8 +23,9 @@ sample_sites_df <- sample_sites %>%
          Y = st_coordinates(.)[,2]) %>%
   st_drop_geometry() %>%
   rename(Site_Name = site_name,
-         Severity_Class = severity) %>%
-  select(Fire_State,Fire_Name,Site_Name,Severity_Class,X,Y)
+         Severity_Class = severity,
+         Slope_Class = slope) %>%
+  select(Fire_State,Fire_Name,Site_Name,Severity_Class,Slope_Class,X,Y)
 
 caps_names <- c("CALDOR","DIXIE","KNP_COMPLEX","CEDAR_CREEK","CUB_CREEK_2")
 dfs <- list()
@@ -35,12 +36,13 @@ for(i in 1:length(fires)){
                     paste0(caps_names[i], "_2021_PROGRESSION_CORRECTED.shp")))
   
   sites <- vect(here(fires[i],
-                     paste0(fires[i],"_sample_sites_NEW.shp")))
+                     paste0(fires[i],"_sample_sites_NEW2.shp")))
   
   prog <- project(prog,sites)
   df <- data.frame("Fire_Name" = rep(NA,nrow(sites)),
                    "Site_Name" = rep(NA,nrow(sites)),
                    "Severity_Class" = rep(NA,nrow(sites)),
+                   "Slope_Class" = rep(NA,nrow(sites)),
                    "Fire_Date" = rep(NA,nrow(sites)))
   
   for(j in 1:nrow(sites)){
@@ -50,12 +52,13 @@ for(i in 1:length(fires)){
     df$Fire_Name[j] <- fires[i]
     df$Site_Name[j] <- sites[j,]$site_name
     df$Severity_Class[j] <- sites[j,]$severity
+    df$Slope_Class[j] <- sites[j,]$slope
     df$Fire_Date[j] <- as.character(burn_day[1])
   }
   dfs[[i]] <- df
 }
 fire_dates <- bind_rows(dfs)
 
-final_df <- left_join(sample_sites_df,fire_dates,by=c("Fire_Name","Site_Name","Severity_Class"))
+final_df <- left_join(sample_sites_df,fire_dates,by=c("Fire_Name","Site_Name","Severity_Class","Slope_Class"))
 
-write.csv(final_df, here("Sample_Sites_NEW.csv"), row.names=F)
+write.csv(final_df, here("Sample_Sites_NEW2.csv"), row.names=F)
