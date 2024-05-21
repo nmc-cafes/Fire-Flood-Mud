@@ -52,7 +52,7 @@ def main():
     conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i == 0:
+        if i == 3:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -254,8 +254,8 @@ class QuicfireRun:
         # Modify canopy rhof
         rhof[1:10, :, :] = rhof[1:10, :, :] * 5
         rhof[1:, :, :][rhof[1:, :, :] > 2.0] = 2.0
-        for z in range(1, rhof.shape[0]):
-            plot_array(rhof[z, :, :], f"canopy rhof layer {z}")
+        # for z in range(1, rhof.shape[0]):
+        #     plot_array(rhof[z, :, :], f"canopy rhof layer {z}")
 
         # plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
         # plot_array(moist[0, :, :], f"modified moisture {self.margins}")
@@ -317,7 +317,7 @@ class QuicfireRun:
             low_coords[0], low_coords[1], center_coords[0], center_coords[1]
         )
         self.wind_dir = int(round(new_wdir))
-        # plot_array(topo, f"{self.site_name} topo")
+        plot_array(topo, f"{self.site_name} topo", save=self.site_path)
 
     def get_ignition(self):
         """
@@ -739,12 +739,14 @@ def _get_margin_indices(array_size, margin_width):
     return result_margins
 
 
-def plot_array(x, title):
+def plot_array(x, title, save: Path = None):
     plt.figure(2)
     plt.set_cmap("viridis")
     plt.imshow(x, origin="lower")
     plt.colorbar()
     plt.title(title, fontsize=18)
+    if save:
+        plt.savefig(save)
     plt.show()
 
 
