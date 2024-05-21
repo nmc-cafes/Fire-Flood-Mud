@@ -41,7 +41,7 @@ import duet_tools as duet
 
 def main():
     HERE = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud")
-    sites_path = HERE / "Sample_sites_NEW.csv"
+    sites_path = HERE / "Sample_sites_NEW2.csv"
     fire_df = pd.read_csv(sites_path)
     fire_gdf = gpd.GeoDataFrame(
         fire_df,
@@ -52,7 +52,7 @@ def main():
     conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i >= 0:
+        if i == 0:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             fire_date = fire_gdf.iloc[i]["Fire_Date"]
@@ -251,21 +251,15 @@ class QuicfireRun:
         moist[0, :, :][margins] = self.conditions[1]
         height[0, :, :][margins] = self.conditions[2]
 
-        # Modify canopy moisture
-        moist[1:, :, :][np.where(moist[1:, :, :] > 0)] = 0.1
-        # for z in range(1, moist.shape[0]):
-        #     moist_margins = moist[z, :, :][margins]
-        #     moist_margins[np.where(moist_margins > 0)] = 0.4
-        #     moist[z, :, :][margins] = moist_margins
+        # Modify canopy rhof
+        rhof[1:10, :, :] = rhof[1:10, :, :] * 5
+        rhof[1:, :, :][rhof[1:, :, :] > 2.0] = 2.0
+        for z in range(1, rhof.shape[0]):
+            plot_array(rhof[z, :, :], f"canopy rhof layer {z}")
 
         # plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
         # plot_array(moist[0, :, :], f"modified moisture {self.margins}")
         # plot_array(height[0, :, :], f"modified height {self.margins}")
-
-        # plot_array(
-        #     moist[1, :, :],
-        #     f"modified moisture {self.margins}",
-        # )
 
         _write_array_to_dat(rhof, "treesrhof.dat", self.site_path, reshape=False)
         _write_array_to_dat(moist, "treesmoist.dat", self.site_path, reshape=False)
