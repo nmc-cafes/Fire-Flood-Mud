@@ -20,33 +20,6 @@ percent_rcl <- function(rst, threshold){
   return(rst_cls)
 }
 
-slope_pct <- function(slope, steep_degrees){
-  rcl_mat = matrix(c(0,steep_degrees,0,
-                     steep_degrees, Inf, 1),
-                   nrow=2, byrow=T)
-  slope_classify <- classify(slope, rcl_mat, right=NA)
-  steep_pct <- focal(slope_classify, w=17, fun = "mean", na.policy = "omit", na.rm=T)
-  return(steep_pct)
-}
-
-stratify_slope <- function(fire_name, steep_degrees, threshold, write=NULL){
-  DEM <- rast(here(fire_name,paste0(fire_name,"_DEM.tif")))
-  slope <- terrain(DEM, v="slope", neighbors=8, unit="degrees")
-  steep_pct <- slope_pct(slope, 23)
-  steep_slope <- classify(steep_pct, 
-                          rcl = matrix(c(0,threshold,NA,threshold,1,1),nrow=2,byrow=T),
-                          include.lowest=T)
-  shallow_slope <- classify(steep_pct, 
-                            rcl = matrix(c(0,threshold,1,threshold,1,NA),nrow=2,byrow=T),
-                            include.lowest=T)
-  slope_stack <- c(steep_slope, shallow_slope)
-  names(slope_stack) <- c("steep","shallow")
-  if(!is.null(write)){
-    writeRaster(slope_stack, here(fire_name, write), overwrite=T)
-  }
-  return(slope_stack)
-}
-
 drainage_proximity <- function(fire_name, fire_perimeter, streams, buffer_inner, EPSG, save = F, overwrite = T){
   print("      Generating inner buffer...")
   drainage_buffer_inner <- buffer(streams, buffer_inner)
@@ -201,30 +174,6 @@ if(PERIMETERS_DONE==FALSE){
 
 fires <- c("Dixie","Caldor","KNP","CubCreek2","CedarCreek")
 
-## Process DEMs
-DEM_DONE = TRUE
-if(DEM_DONE == FALSE){
-  for(fire in fires){
-    print(fire)
-    perimeter <- vect(here(fire,paste0(fire,"_perimeter.shp")))
-    file_list <- list.files(here(fire,"DEM"))
-    tile_list <- list()
-    for(i in 1:length(file_list)){
-      tile_list[i] <- rast(here(fire,"DEM",file_list[i]))
-    }
-    print("   -collecting")
-    collection <- sprc(tile_list)
-    print("   -merging")
-    merged <- mosaic(collection)
-    print("   -clipping")
-    merged_clip <- clip_to_fire(merged, perimeter, EPSG)
-    print("   -plotting")
-    plot(merged_clip)
-    print("   -writing")
-    writeRaster(merged_clip, here(fire,paste0(fire,"_DEM.tif")), overwrite = T)
-  }
-}
-
 ## Select Sites
 all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
 for(fire_name in fires){
@@ -238,9 +187,6 @@ for(fire_name in fires){
   print("   border")
   perimeter_buffer <- buffer(perimeter, -500)
   upslope_fire <- clip_to_fire(upslope_zone, perimeter_buffer, EPSG)
-  # slope must be at least 23 deg
-  print("   slope")
-  slope_stack <- stratify_slope(fire_name, steep_degrees = 23, threshold = 0.5, write = "slope_stratified_510m.tif")
   # stratify across severity
   print("   severity")
   severity_stack <- stratify_severity(fire_name, perimeter_buffer, epsg=EPSG, threshold = 0.5)
