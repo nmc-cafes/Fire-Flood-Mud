@@ -35,46 +35,65 @@ drainage_proximity <- function(fire_name, fire_perimeter, streams, buffer_inner,
   return(drainage_buffer)
 }
 
-severity_pct <- function(fire_name, perimeter, severity_class, EPSG){
+stratify_severity <- function(fire_name, perimeter, epsg, write=NULL){
   severity <- rast(here(fire_name, paste0(fire_name,"_Severity.tif")))
-  severity_clip <- clip_to_fire(severity, perimeter, EPSG)
-  if(severity_class=="high"){
-    rcl_mat = matrix(c(0,3,0,
-                       4,4,1,
-                       5,Inf, 0),
-                     nrow = 3,
-                     byrow = T)
-  } else if(severity_class=="moderate"){
-    rcl_mat = matrix(c(0,2,0,
-                       3,3,1,
-                       4,Inf, 0),
-                     nrow = 3,
-                     byrow = T)
-  } else if(severity_class=="low"){
-    rcl_mat = matrix(c(0,0,0,
-                       1,2,1,
-                       3,Inf, 0),
-                     nrow = 3,
-                     byrow = T)
-  }
-  severity_classify <- classify(severity, rcl_mat, right=NA)
-  sev_pct <- focal(severity_classify, w=17, fun = "mean", na.policy = "omit", na.rm=T)
-  names(sev_pct) <- severity_class
-  return(sev_pct)
-}
-
-stratify_severity <- function(fire_name, perimeter_buffer, threshold, epsg, write=NULL){
-  high_sev_pct <- severity_pct(fire_name, perimeter_buffer, "high", epsg)
-  mod_sev_pct <- severity_pct(fire_name, perimeter_buffer, "moderate", epsg)
-  low_sev_pct <- severity_pct(fire_name, perimeter_buffer, "low", epsg)
-  high_severity <- percent_rcl(high_sev_pct, threshold)
-  moderate_severity <- percent_rcl(mod_sev_pct, threshold)
-  low_severity <- percent_rcl(low_sev_pct, threshold)
-  severity_stack <- c(high_severity,moderate_severity,low_severity)
+  severity_clip <- clip_to_fire(severity, perimeter, epsg)
+  dNBR <- rast(here(fire_name, paste0(fire_name,"_dNBR.tif")))
+  dNBR_clip <- clip_to_fire(dNBR, perimeter, epsg)
+  
+  high_cutoff <- min(dNBR_clip[severity_clip==4])
+  mod_cutoff <- min(dNBR_clip[severity_clip==3])
+  low_cutoff <- min(dNBR_clip[severity_clip==2])
+  
+  dNBR_focal <- focal(dNBR_clip, w=17, fun=mean, na.policy="omit", na.rm=T)
+  high_severity <- dNBR_focal
+  high_severity[high_severity<high_cutoff] <- 0
+  mod_severity <- dNBR_focal
+  mod_severity[mod_severity<mod_cutoff] <- 0
+  mod_severity[mod_severity>=high_cutoff] <- 0
+  low_severity <- dNBR_focal
+  low_severity[low_severity<low_cutoff] <- 0
+  low_severity[low_severity>=mod_cutoff] <- 0
+  
+  severity_stack <- c(high_severity, mod_severity, low_severity)
+  names(severity_stack) <- c("high","moderate","low")
+  severity_stack[severity_stack>0] <- 1
   if(!is.null(write)){
     writeRaster(severity_stack, here(fire_name, write), overwrite=T)
   }
   return(severity_stack)
+}
+
+Mode <- function(x) {
+  ux <- unique(x, na.rm=T)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+find_homogeneity <- function(x,threshold){
+  y <- x[ceiling(length(x)/2)]
+  x_mode <- Mode(x)
+  x[x!=x_mode] <- NA
+  x[x==x_mode] <- 1
+  x[is.na(x)] <- 0
+  pct_mode <- mean(x)
+  if(pct_mode > threshold){
+    return(1)
+  }else{
+    return(0)
+  }
+}
+
+stratify_homogeneity <- function(fire_name, perimeter_buffer, threshold, epsg, write=NULL){
+  severity <- rast(here(fire_name, paste0(fire_name,"_Severity.tif")))
+  homogeneity <- focal(severity, w=17, fun = find_homogeneity, threshold=threshold, na.policy="omit")
+  heterogeneity <- homogeneity
+  heterogeneity[heterogeneity==1] <- NA
+  heterogeneity[heterogeneity==0] <- 1
+  heterogeneity[is.na(heterogeneity)] <-0
+  homogeneity_stack <- c(homogeneity,heterogeneity)
+  names(homogeneity_stack) <- c("homogeneous","heterogeneous")
+  homogeneity_stack <- clip_to_fire(homogeneity_stack, perimeter_buffer, epsg)
+  return(homogeneity_stack)
 }
 
 filter_distance <- function(raster, size, min_dist, max_iters=1e6){
@@ -95,18 +114,23 @@ filter_distance <- function(raster, size, min_dist, max_iters=1e6){
   
   rejection_grid <- dat
   rejection_grid[is.na(rejection_grid)] <- -99
+  rejection_grid[rejection_grid==0] <- -99
   samples <- data.frame("x"=rep(NA,size),"y"=rep(NA,size))
   nc <- 1
   iters <- 1
+  valid <- which(rejection_grid==1, arr.ind = T)
   while(nc <= size){
-    i <- sample(seq(r, nrow(dat)-r),1)
-    j <- sample(seq(r, ncol(dat)-r),1)
-    if(rejection_grid[i,j]==1){
-      if(all(rejection_grid[(i-r):(i+r),(j-r):(j+r)]!=0)){
-        rejection_grid[(i-r):(i+r),(j-r):(j+r)] <- rejection_grid[(i-r):(i+r),(j-r):(j+r)] * rejection_kernel
-        samples$x[nc] <- j
-        samples$y[nc] <- i
-        nc <- nc+1
+    coord <- sample(1:nrow(valid),1)
+    i <- valid[coord,1]
+    j <- valid[coord,2]
+    if((i > r) & (i < nrow(dat)-r)){
+      if((j>r) & (j<ncol(dat)-r)){
+        if(all(rejection_grid[(i-r):(i+r),(j-r):(j+r)]!=0)){
+          rejection_grid[(i-r):(i+r),(j-r):(j+r)] <- rejection_grid[(i-r):(i+r),(j-r):(j+r)] * rejection_kernel
+          samples$x[nc] <- j
+          samples$y[nc] <- i
+          nc <- nc+1
+        }
       }
     }
     iters <- iters+1
@@ -129,11 +153,11 @@ sample_stratified <- function(rst_stk, size){
   size_strat <- size/6
   j <- 1
   for(sev in c("high","moderate","low")){
-    for(slope in c("steep","shallow")){
-      layer <- paste(sev,slope,sep="-")
+    for(homo in c("homogeneous","heterogeneous")){
+      layer <- paste(sev,homo,sep="-")
       sites <- filter_distance(rst_stk[layer], size=size_strat, min_dist=1000)
       sites$severity=sev
-      sites$slope=slope
+      sites$homo=homo
       if(j==1){
         sample_sites <- sites
       } else{
@@ -189,20 +213,23 @@ for(fire_name in fires){
   upslope_fire <- clip_to_fire(upslope_zone, perimeter_buffer, EPSG)
   # stratify across severity
   print("   severity")
-  severity_stack <- stratify_severity(fire_name, perimeter_buffer, epsg=EPSG, threshold = 0.5)
+  severity_stack <- stratify_severity(fire_name, perimeter_buffer, EPSG)
+  # stratify across homogeneity
+  print("   homogeneity")
+  homogeneity_stack <- stratify_homogeneity(fire_name, perimeter_buffer, epsg=EPSG, threshold = 0.75)
   # combine all 4 criteria
   print("   combine")
-  upslope <- clip_to_fire(slope_stack, upslope_fire, EPSG)
-  upslope_project <- project(upslope, severity_stack, method = "near")
-  steep_severity <- severity_stack * upslope_project$steep
-  names(steep_severity) <- c("high-steep","moderate-steep","low-steep")
-  shallow_severity <- severity_stack * upslope_project$shallow
-  names(shallow_severity) <- c("high-shallow","moderate-shallow","low-shallow")
-  upslope_severity <- c(steep_severity,shallow_severity)
+  homo <- clip_to_fire(homogeneity_stack, upslope_fire, EPSG)
+  homo_project <- project(homo, severity_stack, method = "near")
+  homogeneous_severity <- severity_stack * homo_project$homogeneous
+  names(homogeneous_severity) <- c("high-homogeneous","moderate-homogeneous","low-homogeneous")
+  heterogeneous_severity <- severity_stack * homo_project$heterogeneous
+  names(heterogeneous_severity) <- c("high-heterogeneous","moderate-heterogeneous","low-heterogeneous")
+  homo_severity <- c(homogeneous_severity,heterogeneous_severity)
   # randomly sample sites, making sure they are at least 1km apart
   print("   sample")
   size <- 18
-  sample_sites <- sample_stratified(upslope_severity, size)
+  sample_sites <- sample_stratified(homo_severity, size)
   sample_sites$site_name <- NA
   for(i in 1:length(sample_sites)){
     sample_sites$site_name[i] <- paste0(fire_name,i)
