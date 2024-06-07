@@ -41,7 +41,7 @@ import duet_tools as duet
 
 def main():
     HERE = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud")
-    sites_path = HERE / "Sample_sites_NEW2.csv"
+    sites_path = HERE / "Sample_Sites_NEW2.csv"
     fire_df = pd.read_csv(sites_path)
     fire_gdf = gpd.GeoDataFrame(
         fire_df,
@@ -52,10 +52,9 @@ def main():
     conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i == 3:
+        if i >= 88:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
-            fire_date = fire_gdf.iloc[i]["Fire_Date"]
             site_coords = fire_gdf.iloc[i]["geometry"]
             og_path = HERE
 
@@ -64,7 +63,6 @@ def main():
             qf_run = QuicfireRun(
                 fire_name,
                 site_name,
-                fire_date,
                 site_coords,
                 og_path,
                 conditions,
@@ -89,7 +87,6 @@ class QuicfireRun:
         self,
         fire_name,
         site_name,
-        fire_date,
         site_coords,
         og_path,
         conditions,
@@ -104,7 +101,6 @@ class QuicfireRun:
         self.OG_PATH = OG_PATH
         self.fire_name = fire_name
         self.site_name = site_name
-        self.fire_date = fire_date
         self.site_coords = site_coords
         self.EPSG = EPSG
         self.buffer = buffer
@@ -119,7 +115,6 @@ class QuicfireRun:
         self.shp_name = self.site_name + "_bounds_500m.shp"
         self.fgrid_name = self.site_name + "_fuelgrid.zip"
         self.mutable_name = self.site_name + "_fastfuels.zarr"
-        self.dnbr_name = self.fire_name + "_dNBR.tif"
         # Done
         self.burnplot_done = burnplot_done
         self.fastfuels_done = fastfuels_done
@@ -251,11 +246,13 @@ class QuicfireRun:
         moist[0, :, :][margins] = self.conditions[1]
         height[0, :, :][margins] = self.conditions[2]
 
+        for z in range(1, moist.shape[0]):
+            moist[z, :, :][margins] = 0.1  # canopy fuels 10% moisture in margins
+            # plot_array(moist[z, :, :], f"canopy moisture layer {z}")
+
         # Modify canopy rhof
-        rhof[1:10, :, :] = rhof[1:10, :, :] * 5
-        rhof[1:, :, :][rhof[1:, :, :] > 2.0] = 2.0
-        # for z in range(1, rhof.shape[0]):
-        #     plot_array(rhof[z, :, :], f"canopy rhof layer {z}")
+        # rhof[1:10, :, :] = rhof[1:10, :, :] * 5
+        # rhof[1:, :, :][rhof[1:, :, :] > 2.0] = 2.0
 
         # plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
         # plot_array(moist[0, :, :], f"modified moisture {self.margins}")
@@ -317,7 +314,7 @@ class QuicfireRun:
             low_coords[0], low_coords[1], center_coords[0], center_coords[1]
         )
         self.wind_dir = int(round(new_wdir))
-        plot_array(topo, f"{self.site_name} topo", save=self.site_path)
+        # plot_array(topo, f"{self.site_name} topo", save=self.site_path)
 
     def get_ignition(self):
         """
