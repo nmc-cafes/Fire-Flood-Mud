@@ -58,15 +58,18 @@ low_homo$heterogeneity <- "Homogeneous"
 low_hetero$heterogeneity <- "Heterogeneous"
 
 sev_classes <- rbind(high_homo,high_hetero,mod_homo,mod_hetero,low_homo,low_hetero)
+sev_classes <- sev_classes %>%
+  mutate(severity = factor(severity, levels = c("High","Moderate","Low")),
+         heterogeneity = factor(heterogeneity, levels = c("Heterogeneous","Homogeneous")))
 
 orange <- colorblind_pal()(8)[2]
 blue <- colorblind_pal()(8)[3]
 yellow <- colorblind_pal()(8)[5]
 
-my_colors <- c("purple4",blue,orange)
+my_colors <- c("purple4",orange, blue)
 
 site_selection <- ggplot() +
-  geom_spatvector(data = perimeter, color = "black", linewidth = 0.7, fill = NA) +
+  geom_spatvector(data = perimeter, color = "black", linewidth = 0.7, fill = "gray85") +
   geom_spatvector(data = sev_classes, aes(fill=severity,alpha=heterogeneity), color = NA) +
   scale_fill_manual(values = my_colors) +
   scale_alpha_discrete(range = c(0.7,1)) +
@@ -79,7 +82,9 @@ site_selection <- ggplot() +
   theme(axis.ticks = element_blank(),
         axis.text = element_blank(),
         legend.position = c(0.15,0.2),
-        legend.background = element_rect(fill=NA))
+        legend.background = element_rect(fill=NA)) + 
+  guides(fill  = guide_legend(order = 1),
+         alpha = guide_legend(order = 2))
 site_selection
 
 ggsave(here("Plots","site_selection_CubCreek.jpg"), site_selection, height = 18, width = 15.5, units = "cm")
