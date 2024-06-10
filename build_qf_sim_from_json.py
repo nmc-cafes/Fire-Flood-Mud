@@ -17,13 +17,13 @@ ensemble_dir = Path(__file__).parent / "QF_runs" / "Expanded_Sampling"
 qf_path = (
     Path(__file__).parent.parent.parent
     / "Quicfire"
-    / "QF_6.0.0"
+    / "QF_6.0.1"
     / "exe"
     / "quicfire_LIN64.exe"
 )
 
 for fire in fires:
-    sites = [f"{fire}{i}" for i in range(1, 16)]
+    sites = [f"{fire}{i}" for i in range(1, 19)]
     for site in sites:
         print(f"{fire} - {site}")
         run_path = qf_dir / fire / f"{fire}_{site}_duet"

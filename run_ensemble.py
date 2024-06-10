@@ -20,7 +20,7 @@ def main():
     fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
     executables = []
     for fire in fires:
-        for site in range(1, 16):
+        for site in range(1, 19):
             exe = os.path.join(ensemble_dir, fire, f"{fire}_{fire}{site}_duet")
             executables.append(exe)
 

@@ -16,7 +16,9 @@ def plot_array(x, title):
     plt.show()
 
 
-runs_dir = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud/QF_runs/")
+runs_dir = Path(
+    "/Users/ntutland/Documents/Projects/Fire-Flood-Mud/QF_runs/Expanded_Sampling"
+)
 
 
 def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -192,16 +194,10 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
     return max_react
 
 
-fire_site_dict = {
-    "Caldor": ["American", "Camp1", "Camp2", "Camp3", "Strawberry"],
-    "CedarCreek": ["Cedar1", "Cedar2", "Wolf1", "Wolf2", "Wolf3"],
-    "CubCreek2": ["Chewuch", "Eightmile", "Falls", "LambButte", "Sherwood"],
-    "Dixie": ["Genesee", "Kings", "Rush", "Ward", "Yellow"],
-    "KNP": ["AshMountain", "KaweahMiddle", "KaweahNorth", "Potwisha", "Yucca"],
-}
-for fire in fire_site_dict.keys():
+fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+for fire in fires:
     fire_dir = runs_dir / fire
-    sites = fire_site_dict.get(fire)
+    sites = [f"{fire}{i}" for i in range(1, 19)]
     runs = [f"{fire}_{site}_duet" for site in sites]
     for run in runs:
         print(run)
