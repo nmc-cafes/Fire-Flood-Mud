@@ -132,12 +132,17 @@ def get_residence_time_from_power(
     sim: SimulationOutputs, arrpath: Path, plot: bool = True
 ):
     energy = sim.get_output("surfEnergy")
+    full_arr = energy.to_numpy()
+    max_arr = np.max(full_arr[:, 0, :, :], axis=0)
+    mean = np.mean(max_arr[max_arr > 0])
+    threshold = 0.05 * mean
     initial = energy.to_numpy(timestep=0)
     prev = initial[0, 0, :, :]
     for t in range(1, len(energy.times)):
         temp = energy.to_numpy(timestep=t)
         temp = temp[0, 0, :, :]
-        temp[np.where(temp > 0)] = 1
+        temp[np.where(temp <= threshold)] = 0
+        temp[np.where(temp > threshold)] = 1
         prev = np.add(temp, prev)
     residence_time = prev.copy()
     if plot:
