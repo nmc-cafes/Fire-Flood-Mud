@@ -119,6 +119,22 @@ high_sev <- dat_site_long %>%
 high_sev
 ggsave(here("Plots","percent_highseverity_ES.jpg"), steep_high_sev, height = 12, width = 18, units = "cm")
 
+## log-log
+dNBR_loglog <- dat_site_long %>%
+  mutate(val = log(val),
+         dNBR = log(dNBR)) %>%
+  ggplot() +
+  geom_point(aes(val,dNBR,color=fire)) +
+  geom_smooth(aes(val,dNBR), method="lm", color = "black") +
+  facet_wrap(.~var, scales="free_x") +
+  scale_color_colorblind() +
+  labs(x="",
+       y="dNBR",
+       color = "Focal Fire") +
+  theme_bw()
+dNBR_loglog
+
+ggsave(here("Plots","avg_dNBR_loglog.jpg"), dNBR_loglog, height = 12, width = 18, units = "cm")
 
 #################
 ## Try some preliminary model selection
@@ -128,38 +144,35 @@ library(leaps)
 dat_scaled <- dat_site
 dat_scaled[8:13] <- as.data.frame(scale(dat_scaled[8:13]))
 
+dat_loglog <- dat_site %>%
+  mutate(across(c(dNBR,surface_consumption,canopy_consumption, max_power, residence_time_power), log))
+
 # dNBR
-best_subset <- regsubsets(dNBR_scaled ~ 
-                            mass_burnt_pct + 
+best_subset <- regsubsets(dNBR ~ 
                             surface_consumption +
-                            surface_consumption_pct +
                             canopy_consumption +
                             max_power + 
-                            residence_time_power +
-                            residence_time_consumption, 
-                          dat_scaled)
+                            residence_time_power,
+                          dat_loglog)
 summary(best_subset)
 
 # create training - testing data
 set.seed(47)
-sample <- sample(c(TRUE, FALSE), nrow(dat_scaled), replace = T, prob = c(0.6,0.4))
-train <- dat_scaled[sample, ]
-test <- dat_scaled[!sample, ]
+sample <- sample(c(TRUE, FALSE), nrow(dat_loglog), replace = T, prob = c(0.7,0.3))
+train <- dat_loglog[sample, ]
+test <- dat_loglog[!sample, ]
 
 # perform best subset selection
-best_subset <- regsubsets(dNBR_scaled ~ 
-                            mass_burnt_pct + 
+best_subset <- regsubsets(dNBR ~ 
                             surface_consumption +
-                            surface_consumption_pct +
                             canopy_consumption +
                             max_power + 
-                            residence_time_power +
-                            residence_time_consumption,
+                            residence_time_power,
                           train)
 results <- summary(best_subset)
 
 # extract and plot results
-tibble(predictors = 1:7,
+tibble(predictors = 1:4,
        adj_R2 = results$adjr2,
        Cp = results$cp,
        BIC = results$bic) %>%
@@ -178,20 +191,17 @@ which.min(results$bic)
 which.min(results$cp)
 
 # direct testing
-test_m <- model.matrix(dNBR_scaled ~ 
-                         mass_burnt_pct + 
+test_m <- model.matrix(dNBR ~ 
                          surface_consumption +
-                         surface_consumption_pct +
                          canopy_consumption +
                          max_power + 
-                         residence_time_power +
-                         residence_time_consumption,
+                         residence_time_power,
                        test)
 
 # create empty vector to fill with error values
-validation_errors <- vector("double", length = 6)
+validation_errors <- vector("double", length = 4)
 
-for(i in 1:6) {
+for(i in 1:4) {
   coef_x <- coef(best_subset, id = i)                     # extract coefficients for model size i
   pred_x <- test_m[ , names(coef_x)] %*% coef_x           # predict salary using matrix algebra
   validation_errors[i] <- mean((test$dNBR - pred_x)^2)  # compute test error btwn actual & predicted salary
@@ -212,26 +222,23 @@ predict_regsubsets <- function(object, newdata, id ,...) {
 # create matrix to store results
 k <- 10
 set.seed(4747)
-folds <- sample(1:k, nrow(dat_scaled), replace = TRUE)
-cv_errors <- matrix(NA, k, 6, dimnames = list(NULL, paste(1:6)))
+folds <- sample(1:k, nrow(dat_loglog), replace = TRUE)
+cv_errors <- matrix(NA, k, 4, dimnames = list(NULL, paste(1:4)))
 
 for(j in 1:k) {
   
   # perform best subset on rows not equal to j
-  best_subset_j <- regsubsets(dNBR_scaled ~ 
-                                mass_burnt_pct + 
+  best_subset_j <- regsubsets(dNBR ~ 
                                 surface_consumption +
-                                surface_consumption_pct +
                                 canopy_consumption +
                                 max_power + 
-                                residence_time_power +
-                                residence_time_consumption,
-                            dat_scaled[folds != j, ], nvmax = 6)
+                                residence_time_power,
+                            dat_loglog[folds != j, ], nvmax = 6)
   
   # perform cross-validation
-  for(i in 1:6) {
-    pred_x <- predict_regsubsets(best_subset_j, dat_scaled[folds == j, ], id = i)
-    cv_errors[j, i] <- mean((dat_scaled$dNBR[folds == j] - pred_x)^2)
+  for(i in 1:4) {
+    pred_x <- predict_regsubsets(best_subset_j, dat_loglog[folds == j, ], id = i)
+    cv_errors[j, i] <- mean((dat_loglog$dNBR[folds == j] - pred_x)^2)
   }
 }
 
@@ -239,21 +246,18 @@ mean_cv_errors <- colMeans(cv_errors)
 plot(mean_cv_errors, type = "b")
 
 # find final model
-final_best <- regsubsets(dNBR_scaled ~ 
-                           mass_burnt_pct + 
+final_best <- regsubsets(dNBR ~ 
                            surface_consumption +
-                           surface_consumption_pct +
                            canopy_consumption +
                            max_power + 
-                           residence_time_power +
-                           residence_time_consumption,
-                         data = dat_site,
-                         nvmax = 6)
+                           residence_time_power,
+                         data = dat_loglog,
+                         nvmax = 4)
 coef(final_best, which.min(mean_cv_errors))
 
 
 # what is the r-squared, rmse?
-final_mod <- lm(dNBR_scaled ~ mass_burnt_pct + max_power, data=dat_scaled)
+final_mod <- lm(dNBR ~ surface_consumption, data=dat_loglog)
 summary(final_mod)
 
 #############
