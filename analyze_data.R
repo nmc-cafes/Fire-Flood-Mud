@@ -23,10 +23,12 @@ dat_site <- dat %>%
             high_sev_pct = mean(severity%in%c("high")*100),
             mass_burnt_pct = mean(mass_burnt_pct, na.rm=T),
             surface_consumption_pct = mean(surface_consumption_pct,na.rm=T)*100,
-            surface_consumption = mean(surface_consumption,na.rm=T),
+            surface_consumption = sum(surface_consumption,na.rm=T),
             canopy_consumption = mean(canopy_consumption,na.rm=T)*100,
             max_power = mean(max_power,na.rm=T),
             residence_time_power = mean(residence_time_power, na.rm=T))
+
+write.csv(dat_site, here("all_data_expandedsampling_site.csv"), row.names = F)
 
 mburnt_site <- dat_site %>%
   ggplot() +
@@ -82,7 +84,7 @@ dat_site_long <- dat_site %>%
 dNBR_scaled <- dat_site_long %>%
   ggplot() +
   geom_point(aes(val,dNBR_scaled,color=fire)) +
-  geom_smooth(aes(val,dNBR_scaled), method="lm", color = "black") +
+  geom_smooth(aes(val,dNBR_scaled), method="gam", color = "black") +
   facet_wrap(.~var, scales="free_x") +
   scale_color_colorblind() +
   labs(x="",
@@ -336,3 +338,19 @@ mod_sim <- simulateResiduals(final_model)
 plot(mod_sim)
 
 summary(final_model)
+
+
+###########
+# GAM
+
+library(mgcv)
+mod_lm <- gam(dNBR_scaled ~ surface_consumption + canopy_consumption + residence_time_power, data=dat_site)
+mod_gam <- gam(dNBR_scaled ~ s(surface_consumption, bs="cr") + s(canopy_consumption, bs="cr") + s(residence_time_power, bs="cr"), data=dat_site)
+summary(mod_lm)
+summary(mod_gam)
+mod_gam <- update(mod_gam, . ~ . -s(residence_time_power, bs="cr") + residence_time_power)
+summary(mod_gam)
+AIC(mod_lm)
+AIC(mod_gam)
+anova(mod_lm, mod_gam, test = "Chisq")
+
