@@ -275,6 +275,8 @@ dat_high <- dat_scaled %>% filter(severity_class == "high")
 dat_mod <- dat_scaled %>% filter(severity_class == "moderate")
 dat_low <- dat_scaled %>% filter(severity_class == "low")
 
+dat_subsets <- list(dat_homo, dat_hetero, dat_high, dat_mod, dat_low)
+
 mod_mixed <- lmer(dNBR_scaled ~ 
                     mass_burnt_pct + 
                     surface_consumption +
@@ -290,54 +292,54 @@ AICc(mod_mixed)
 # mass_burnt should not be used with either of the percent consumption variables
 # only one of surface consumption and surface consumption pct should be used
 # only one residence time should be used
-
-f1 <- dNBR_scaled ~ mass_burnt_pct + max_power + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f2 <- dNBR_scaled ~ surface_consumption_pct + canopy_consumption + max_power + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f3 <- dNBR_scaled ~ surface_consumption_pct + max_power + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f4 <- dNBR_scaled ~ canopy_consumption + max_power + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f5 <- dNBR_scaled ~ mass_burnt_pct + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f6 <- dNBR_scaled ~ surface_consumption_pct + canopy_consumption + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f7 <- dNBR_scaled ~ surface_consumption_pct + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f8 <- dNBR_scaled ~ canopy_consumption + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f9 <- dNBR_scaled ~ max_power + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f10 <- dNBR_scaled ~ mass_burnt_pct + max_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f11 <- dNBR_scaled ~ surface_consumption_pct + canopy_consumption + max_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f12 <- dNBR_scaled ~ surface_consumption_pct + max_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f13 <- dNBR_scaled ~ canopy_consumption + max_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f14 <- dNBR_scaled ~ mass_burnt_pct + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f15 <- dNBR_scaled ~ surface_consumption_pct + canopy_consumption + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f16 <- dNBR_scaled ~ surface_consumption_pct + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f17 <- dNBR_scaled ~ canopy_consumption + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f18 <- dNBR_scaled ~ max_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f19 <- dNBR_scaled ~ residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-
-f20 <- dNBR_scaled ~ surface_consumption + canopy_consumption + max_power + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f21 <- dNBR_scaled ~ surface_consumption + max_power + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f22 <- dNBR_scaled ~ surface_consumption + canopy_consumption + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f23 <- dNBR_scaled ~ surface_consumption + residence_time_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f24 <- dNBR_scaled ~ surface_consumption + canopy_consumption + max_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f25 <- dNBR_scaled ~ surface_consumption + max_power + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f26 <- dNBR_scaled ~ surface_consumption + canopy_consumption + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-f27 <- dNBR_scaled ~ surface_consumption + (1 | fire) + (1 | severity_class) + (1 | homogeneity_class)
-
-formulae <- c(f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,f21,f22,f23,
-              f24,f25,f26,f27)
-aic_df <- tibble("model" = seq(1,length(formulae)), "AICc" = rep(NA, length(formulae)))
-for(i in 1:length(formulae)){
-  mod <- lmer(formulae[i][[1]], data = dat_scaled)
-  aicc <- AICc(mod)
-  aic_df$AICc[i] <- aicc
+for(i in 1:length(dat_subsets)){
+  
+  f1 <- dNBR_scaled ~ mass_burnt_pct + max_power + residence_time_power + (1 | fire) 
+  f2 <- dNBR_scaled ~ surface_consumption_pct + canopy_consumption + max_power + residence_time_power + (1 | fire) 
+  f3 <- dNBR_scaled ~ surface_consumption_pct + max_power + residence_time_power + (1 | fire) 
+  f4 <- dNBR_scaled ~ canopy_consumption + max_power + residence_time_power + (1 | fire) 
+  f5 <- dNBR_scaled ~ mass_burnt_pct + residence_time_power + (1 | fire) 
+  f6 <- dNBR_scaled ~ surface_consumption_pct + canopy_consumption + residence_time_power + (1 | fire) 
+  f7 <- dNBR_scaled ~ surface_consumption_pct + residence_time_power + (1 | fire) 
+  f8 <- dNBR_scaled ~ canopy_consumption + residence_time_power + (1 | fire) 
+  f9 <- dNBR_scaled ~ max_power + residence_time_power + (1 | fire) 
+  f10 <- dNBR_scaled ~ mass_burnt_pct + max_power + (1 | fire) 
+  f11 <- dNBR_scaled ~ surface_consumption_pct + canopy_consumption + max_power + (1 | fire) 
+  f12 <- dNBR_scaled ~ surface_consumption_pct + max_power + (1 | fire) 
+  f13 <- dNBR_scaled ~ canopy_consumption + max_power + (1 | fire) 
+  f14 <- dNBR_scaled ~ mass_burnt_pct + (1 | fire) 
+  f15 <- dNBR_scaled ~ surface_consumption_pct + canopy_consumption + (1 | fire) 
+  f16 <- dNBR_scaled ~ surface_consumption_pct + (1 | fire) 
+  f17 <- dNBR_scaled ~ canopy_consumption + (1 | fire) 
+  f18 <- dNBR_scaled ~ max_power + (1 | fire) 
+  f19 <- dNBR_scaled ~ residence_time_power + (1 | fire) 
+  
+  f20 <- dNBR_scaled ~ surface_consumption + canopy_consumption + max_power + residence_time_power + (1 | fire) 
+  f21 <- dNBR_scaled ~ surface_consumption + max_power + residence_time_power + (1 | fire) 
+  f22 <- dNBR_scaled ~ surface_consumption + canopy_consumption + residence_time_power + (1 | fire) 
+  f23 <- dNBR_scaled ~ surface_consumption + residence_time_power + (1 | fire) 
+  f24 <- dNBR_scaled ~ surface_consumption + canopy_consumption + max_power + (1 | fire) 
+  f25 <- dNBR_scaled ~ surface_consumption + max_power + (1 | fire) 
+  f26 <- dNBR_scaled ~ surface_consumption + canopy_consumption + (1 | fire) 
+  f27 <- dNBR_scaled ~ surface_consumption + (1 | fire) 
+  
+  formulae <- c(f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,f21,f22,f23,
+                f24,f25,f26,f27)
+  aic_df <- tibble("model" = seq(1,length(formulae)), "AICc" = rep(NA, length(formulae)))
+  for(j in 1:length(formulae)){
+    mod <- lmer(formulae[j][[1]], data = dat_subsets[[i]])
+    aicc <- AICc(mod)
+    aic_df$AICc[j] <- aicc
+  }
+  
+  ggplot(aic_df, aes(model,AICc)) + geom_point()
+  selected <- paste0("f",aic_df[which.min(aic_df$AICc),"model"])
+  final_model <- lmer(get(selected), data = dat_subsets[[i]])
+  mod_sim <- simulateResiduals(final_model)
+  
+  print(summary(final_model))
+  print(r.squaredGLMM(final_model))
 }
-
-ggplot(aic_df, aes(model,AICc)) + geom_point()
-selected <- paste0("f",aic_df[which.min(aic_df$AICc),"model"])
-print(selected)
-print(f17)
-final_model <- lmer(f17, data = dat_scaled)
-mod_sim <- simulateResiduals(final_model)
-plot(mod_sim)
-
-summary(final_model)
 
 
 ###########
