@@ -15,7 +15,7 @@ dat_split <- initial_split(dat, strata = severity_class)
 dat_train <- training(dat_split)
 dat_test <- testing(dat_split)
 
-scaled_formula <- formula(dNBR_scaled ~ surface_consumption_pct + surface_consumption + canopy_consumption + max_power + residence_time_power)
+scaled_formula <- formula(high_sev_pct ~ surface_consumption_pct + surface_consumption + canopy_consumption + max_power + residence_time_power)
 
 dat_rec <- recipe(scaled_formula, data = dat_train) %>%
   step_dummy(all_nominal(), -all_outcomes())
@@ -59,7 +59,7 @@ tune_res %>%
 
 rf_grid <- grid_regular(
   mtry(range = c(1, 5)),
-  min_n(range = c(30, 50)),
+  min_n(range = c(1, 20)),
   levels = 5
 )
 
@@ -91,7 +91,7 @@ library(vip)
 dat_prep <- prep(dat_rec)
 final_rf %>%
   set_engine("ranger", importance = "permutation") %>%
-  fit(dNBR_scaled ~ .,
+  fit(high_sev_pct ~ .,
       data = juice(dat_prep)
   ) %>%
   vip(geom = "point")
@@ -109,12 +109,12 @@ final_res %>%
 final_res %>%
   collect_predictions() %>%
   ggplot() +
-  geom_point(aes(dNBR_scaled,.pred), shape=1, alpha=0.5) +
+  geom_point(aes(high_sev_pct,.pred), shape=1, alpha=0.5) +
   geom_abline(intercept = 0, slope=1, linetype="dashed", color="red") +
-  scale_x_continuous(limits = c(-1.5,1.5)) +
-  scale_y_continuous(limits = c(-1.5,1.5)) +
-  labs(x="Observed dNBR (scaled)",
-       y="Predicted dNBR (scaled)") +
+  scale_x_continuous(limits = c(0,100)) +
+  scale_y_continuous(limits = c(0,100)) +
+  labs(x="Observed Percent Burneed at High Severity",
+       y="Predicted Percent\nBurned at High Severity") +
   theme_bw() +
   theme(aspect.ratio = 1)
   
