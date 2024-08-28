@@ -34,6 +34,50 @@ dat_site <- dat %>%
 
 write.csv(dat_site, here("all_data_expandedsampling_site.csv"), row.names = F)
 
+#### Only sites with steep slopes
+steep_sites <- dat %>%
+  filter(slope > 23) %>%
+  pull(site) %>%
+  unique()
+
+dat_steep <- dat %>%
+  filter(site %in% steep_sites)
+
+steep_count <- dat_steep %>%
+  group_by(site) %>%
+  count(is_steep = slope > 23) %>%
+  rename(steep_count = n) %>%
+  filter(is_steep == TRUE) %>%
+  select(site, steep_count)
+
+dat_steep_site <- dat_steep %>%
+  group_by(site, severity_class, homogeneity_class, fire) %>%
+  mutate(steep = if_else(slope>23, 1, 0)) %>%
+  mutate(severe = if_else(severity%in%c("high","moderate"),1,0)) %>%
+  summarize(dNBR = mean(dNBR),
+            dNBR_scaled = mean(dNBR_scaled, na.rm=T),
+            high_sev_pct = mean(severe)*100,
+            mass_burnt_pct = mean(mass_burnt_pct, na.rm=T),
+            surface_consumption_pct = mean(surface_consumption_pct,na.rm=T)*100,
+            surface_consumption = sum(surface_consumption,na.rm=T),
+            canopy_consumption = mean(canopy_consumption,na.rm=T)*100,
+            max_power = mean(max_power,na.rm=T),
+            residence_time_power = mean(residence_time_power, na.rm=T),
+            high_sev_steep = ) %>%
+  mutate(high_sev_bin = if_else(high_sev_pct>25,1,0)) %>%
+  mutate(high_sev_bin = factor(high_sev_bin)) %>%
+  left_join(steep_count, by = join_by(site))
+
+dat_steep_site %>%
+  ggplot() +
+  geom_point(aes(x=steep_count, y=high_sev_steep, color=fire)) +
+  scale_color_colorblind() +
+  labs(x="Number of 30m Grid Cells > 23deg Slope",
+       y="Percent Burned at\nHigh Severity on Steep Slopes",
+       color="Focal Fire") +
+  theme_bw()
+
+###########
 mburnt_site <- dat_site %>%
   ggplot() +
   geom_bar(stat = "identity", aes(site,mass_burnt_pct,fill=fire)) +
