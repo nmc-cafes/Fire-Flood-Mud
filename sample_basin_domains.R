@@ -5,42 +5,57 @@
 
 # load library
 library(terra)
+library(here)
 
 # load shapefile
-polygons <- vect("data/niko_shp/KNP_sample_basins.shp")
-# plot(polygons)
+fires <- c("Dixie","KNP","Caldor","CedarCreek","CubCreek2")
+for(fire in fires){
+  cat(fire,"\n")
+  polygons <- vect(here(fire,paste0(fire,"_sample_basins.shp")))
+  # plot(polygons)
+  
+  # loop through each polygon
+  for (i in 1:nrow(polygons)) {
+    basin_name <- paste0(substr(fire, start = 1, stop = 3),i)
+    cat("   ",basin_name,"\n")
+    
+    # create an output directory if it doesn't exist
+    output_dir <- here(fire,"Sample_Basins",basin_name)
+    if (!dir.exists(output_dir)) {
+      dir.create(output_dir)
+    }
+    
+    # extract the individual polygon
+    polygon <- polygons[i, ]
+    
+    # calculate the bounding box
+    bbox <- ext(polygon)
+    
+    # create a SpatVector from the bounding box
+    bbox_polygon <- as.polygons(bbox, crs(polygon))
+    
+    # add a 50-meter buffer to the bounding box
+    buffered_bbox <- buffer(bbox_polygon, 50, joinstyle="mitre")
+    
+    # create a filename for the output shapefile
+    filename <- paste0(basin_name,".shp")
 
-# create an output directory if it doesn't exist
-output_dir <- "outputs/new_shp"
-if (!dir.exists(output_dir)) {
-  dir.create(output_dir)
+    # save the buffered polygon as a new shapefile
+    output_path <- here(output_dir,paste0(basin_name,".shp"))
+    writeVector(buffered_bbox, output_path, overwrite = TRUE)
+  }
 }
 
-# loop through each polygon
-for (i in 1:nrow(polygons)) {
-  # extract the individual polygon
-  polygon <- polygons[i, ]
-  
-  # calculate the bounding box
-  bbox <- ext(polygon)
-  
-  # create a SpatVector from the bounding box
-  bbox_polygon <- as.polygons(bbox, crs(polygon))
-  
-  # add a 50-meter buffer to the bounding box
-  buffered_bbox <- buffer(bbox_polygon, 50)
-  
-  # crop the original polygon with the buffered bounding box
-  cropped_polygon <- crop(polygon,buffered_bbox)
-  
-  # create a filename for the output shapefile
-  filename <- sprintf("polygon_%03d.shp", i)
-  
-  # save the buffered polygon as a new shapefile
-  output_path <- file.path(output_dir, filename)
-  writeVector(cropped_polygon, output_path, overwrite = TRUE)
-}
 
 # Check the result
-test <- vect("outputs/new_shp/polygon_040.shp")
-plot(test)
+test_fire <- "KNP"
+test_num <- 12
+test_name <- paste0(substr(fire, start = 1, stop = 3),test_num)
+test_basins <- vect(here(fire,paste0(fire,"_sample_basins.shp")))
+test_basin <- test_basins[test_num, ]
+test_bbox <- vect(ext(test_basin), crs=crs(test_basin))
+test_domain <- vect(here(fire,"Sample_Basins",test_name,paste0(test_name,".shp")))
+plot(test_domain)
+plot(test_basin, add=T)
+plot(test_bbox, lty="dashed", add=T)
+

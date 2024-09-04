@@ -122,7 +122,7 @@ for(fire in fires){
     mutate(severe = if_else(severe_per > severity_cutoff, 1, 0)) %>%
     mutate(severe = factor(severe))
 
-  basins_sampled <- basins_final %>% slice_sample(n=20, by=severe)
+  basins_sampled <- basins_final %>% slice_sample(n=10, by=severe)
   writeVector(basins_sampled, here(fire, paste0(fire,"_sample_basins.shp")), overwrite=T)
 }
 
