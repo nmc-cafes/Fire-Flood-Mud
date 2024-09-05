@@ -41,7 +41,7 @@ import duet_tools as duet
 
 def main():
     HERE = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud")
-    sites_path = HERE / "Sample_Sites_NEW2.csv"
+    sites_path = HERE / "Sample_Basins.csv"
     fire_df = pd.read_csv(sites_path)
     fire_gdf = gpd.GeoDataFrame(
         fire_df,
@@ -52,7 +52,7 @@ def main():
     conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i >= 88:
+        if i >= 0:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             site_coords = fire_gdf.iloc[i]["geometry"]
@@ -69,15 +69,12 @@ def main():
                 fastfuels_done=False,
                 duet_done=False,
             )
-            qf_run.create_burnplot()
             qf_run.run_fastfuels()
-            qf_run.modify_fuels()
-            # qf_run.correct_fuelheight()
             qf_run.get_ignition()
+            qf_run.draw_ignition()
             qf_run.run_duet()
             qf_run.calibrate_duet()
             qf_run.modify_fuels()
-            # qf_run.draw_ignition()
             qf_run.quicfire_simulation()
 
 
@@ -108,15 +105,14 @@ class QuicfireRun:
         self.ignition_pace = 5
         # Paths
         self.fire_path = OG_PATH / fire_name
-        qf_name = "_".join([fire_name, site_name, "duet"])
+        qf_name = f"{fire_name}_{site_name}"
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
-        self.site_path = OG_PATH / fire_name / "Sample_Sites" / site_name
+        self.site_path = OG_PATH / fire_name / "Sample_Basins" / site_name
         # Filenames
-        self.shp_name = self.site_name + "_bounds_500m.shp"
+        self.shp_name = self.site_name + ".shp"
         self.fgrid_name = self.site_name + "_fuelgrid.zip"
         self.mutable_name = self.site_name + "_fastfuels.zarr"
         # Done
-        self.burnplot_done = burnplot_done
         self.fastfuels_done = fastfuels_done
         self.duet_done = duet_done
         self.severity_done = severity_done
@@ -135,26 +131,7 @@ class QuicfireRun:
             p.parent.mkdir(exist_ok=True)
             p.mkdir(exist_ok=True)
 
-    def create_burnplot(self):
-        if self.burnplot_done == False:
-            full_size = 500 + (2 * self.buffer)
-            site_poly = self._make_bbox(full_size)
-
-            site_bounds = gpd.GeoDataFrame(site_poly)
-            shp_path = self.site_path / self.shp_name
-            site_bounds.to_file(shp_path)
-
-            self.burnplot_done = True
-        else:
-            print(
-                "Burn plot already created. To rerun, set self.burnplot_done to False"
-            )
-
     def run_fastfuels(self):
-        if not self.burnplot_done:
-            raise Exception(
-                "run_fastfuels: Burn plot must be created before running fastfuels"
-            )
         if self.fastfuels_done == False:
             shp_path = self.site_path / self.shp_name
             fgrid_path = self.site_path / self.fgrid_name
@@ -167,13 +144,13 @@ class QuicfireRun:
             # Create a dataset
             dataset = fastfuels.create_dataset(
                 name=self.site_name,
-                description=self.fire_name + " Fire",
+                description=f"{self.fire_name} Fire",
                 spatial_data=geojson,
             )
 
             # Create a treelist from a dataset
             treelist = dataset.create_treelist(
-                name=self.site_name, description=self.fire_name + " Fire"
+                name=self.site_name, description=f"{self.fire_name} Fire"
             )
 
             # Wait for a treelist to finish generating
@@ -182,7 +159,7 @@ class QuicfireRun:
             # Create a fuelgrid from a treelist
             fuelgrid = treelist.create_fuelgrid(
                 name=self.site_name,
-                description=self.fire_name + " Fire",
+                description=f"{self.fire_name} Fire",
                 distribution_method="realistic",
                 horizontal_resolution=2,
                 vertical_resolution=1,
@@ -303,18 +280,18 @@ class QuicfireRun:
         topo = _read_dat_file(
             self.site_path,
             "topo.dat",
-            arr_dim=(1, self.nx, self.ny),
+            arr_dim=(1, self.ny, self.nx),
             order="C",
         )
         topo = topo[0, :, :]
         lowpoint = np.where(topo == np.min(topo))
-        low_coords = (lowpoint[1][0], lowpoint[0][0])
-        center_coords = (self.nx / 2, self.ny / 2)
-        new_wdir = _calculate_angle(
-            low_coords[0], low_coords[1], center_coords[0], center_coords[1]
-        )
+        highpoint = np.where(topo == np.max(topo))
+        low_coords = np.array([lowpoint[0][0], lowpoint[1][0]])
+        high_coords = np.array([highpoint[0][0], highpoint[1][0]])
+        center_coords = np.array([self.ny / 2, self.nx / 2])
+        new_wdir = _calculate_angle(low_coords, high_coords, center_coords)
         self.wind_dir = int(round(new_wdir))
-        # plot_array(topo, f"{self.site_name} topo", save=self.site_path)
+        plot_array(topo, f"{self.site_name} topo", save=None)
 
     def get_ignition(self):
         """
@@ -346,7 +323,7 @@ class QuicfireRun:
         intersections = ((0, L), (T, self.ny * 2), (self.nx * 2, R), (B, 0))
         border_intersections = []
         for j, k in intersections:
-            if 0 <= j <= self.nx * 2 and 0 <= k <= self.nx * 2:
+            if 0 <= j <= self.nx * 2 and 0 <= k <= self.ny * 2:
                 border_intersections.append((j, k))
 
         switched = [border_intersections[1], border_intersections[0]]
@@ -597,22 +574,6 @@ class QuicfireRun:
 
         return data.wspd[0]
 
-    def _make_bbox(self, dim):
-        dim = dim / 2
-        x = self.site_coords.x
-        y = self.site_coords.y
-        nw, ne, se, sw = (
-            (x - dim, y + dim),
-            (x + dim, y + dim),
-            (x + dim, y - dim),
-            (x - dim, y - dim),
-        )
-        poly = Polygon((nw, ne, se, sw, nw))
-        poly_gdf = gpd.GeoDataFrame(
-            {"site_name": self.site_name, "geometry": poly}, index=[0], crs=self.EPSG
-        )
-        return poly_gdf
-
     def _draw_arrow(self, arrow_length=25):
         start_x = self.nx / 2
         width = arrow_length / 4
@@ -706,13 +667,33 @@ def _pol2cart(rho, phi):
     return (x, y)
 
 
-def _calculate_angle(x1, y1, x2, y2):
-    dx = x1 - x2
-    dy = y1 - y2
-    angle_radians = math.atan2(dx, dy)
-    angle_degrees = math.degrees(angle_radians)
-    angle_degrees %= 360
-    return angle_degrees
+def _unit_vector(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
+    # Calculate the direction vector
+    v = p2 - p1
+
+    # Normalize the vector (optional)
+    magnitude = np.sqrt(np.sum(v**2))
+    unit_vector = v / magnitude
+
+    # Output the direction vector and the unit vector
+    return unit_vector
+
+
+def _calculate_angle(
+    low_coords: np.ndarray, high_coords: np.ndarray, center_coords: np.ndarray
+) -> float:
+    v1 = _unit_vector(low_coords, center_coords)
+    v2 = _unit_vector(center_coords, high_coords)
+    # Calculate the average vector
+    v_avg = np.add(v1, v2) / 2
+
+    # Calculate the angle in radians using atan2
+    angle_radians = math.atan2(v_avg[1], v_avg[0])
+
+    # Convert to degrees
+    angle_degrees = angle_radians * (180 / math.pi)
+    angle = (angle_degrees + 180) % 360
+    return angle
 
 
 def _get_margin_indices(array_size, margin_width):
