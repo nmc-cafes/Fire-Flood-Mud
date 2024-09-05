@@ -30,5 +30,4 @@ sample_sites_df <- sample_sites %>%
   rename(Site_Name = site_name) %>%
   select(Fire_State,Fire_Name,Site_Name,X,Y)
 
-
-write.csv(final_df, here("Sample_Basins.csv"), row.names=F)
+write.csv(sample_sites_df, here("Sample_Basins.csv"), row.names=F)

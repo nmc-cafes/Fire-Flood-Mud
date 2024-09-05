@@ -8,7 +8,7 @@ library(terra)
 library(here)
 
 # load shapefile
-fires <- c("Dixie","KNP","Caldor","CedarCreek","CubCreek2")
+fires <- c("KNP","Caldor","CedarCreek","CubCreek2","Dixie")
 for(fire in fires){
   cat(fire,"\n")
   polygons <- vect(here(fire,paste0(fire,"_sample_basins.shp")))
@@ -48,13 +48,13 @@ for(fire in fires){
 
 
 # Check the result
-test_fire <- "KNP"
-test_num <- 12
-test_name <- paste0(substr(fire, start = 1, stop = 3),test_num)
-test_basins <- vect(here(fire,paste0(fire,"_sample_basins.shp")))
+test_fire <- "Caldor"
+test_num <- 1
+test_name <- paste0(substr(test_fire, start = 1, stop = 3),test_num)
+test_basins <- vect(here(test_fire,paste0(test_fire,"_sample_basins.shp")))
 test_basin <- test_basins[test_num, ]
 test_bbox <- vect(ext(test_basin), crs=crs(test_basin))
-test_domain <- vect(here(fire,"Sample_Basins",test_name,paste0(test_name,".shp")))
+test_domain <- vect(here(test_fire,"Sample_Basins",test_name,paste0(test_name,".shp")))
 plot(test_domain)
 plot(test_basin, add=T)
 plot(test_bbox, lty="dashed", add=T)

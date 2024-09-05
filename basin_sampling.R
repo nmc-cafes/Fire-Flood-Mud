@@ -18,7 +18,7 @@ The resulting set of basins should a) be between 25-100 ha of simulation domain 
 relatively consistent percent area with steep slopes, and c) include an equal number of basins above
 and below the chosen classification threshold for steep and severe slopes.
 "
-fires <- c("Dixie","KNP","Caldor","CedarCreek","CubCreek2")
+fires <- c("KNP","Caldor","CedarCreek","CubCreek2","Dixie")
 for(fire in fires){
   cat(paste0("\n",fire,"\n"))
   cat("   Calculating basin areas")
@@ -110,7 +110,7 @@ for(fire in fires){
   #   scale_fill_viridis_c() +
   #   theme_bw()
   
-  writeVector(basins_steep, here(fire, paste0(fire,"_basins_sensitivity.shp")))
+  writeVector(basins_steep, here(fire, paste0(fire,"_basins_sensitivity.shp")), overwrite=T)
 }
 
 ## Determine severity cutoff using threshold_sensitivity_analysis.R
@@ -135,7 +135,7 @@ ggplot() +
   scale_fill_colorblind() +
   theme_bw()
 
-summary(basins_sampled$area_ext)
+summary(basins_sampled$area)
 
 basins_df <- as.data.frame(basins_sampled)
 basins_df %>%
