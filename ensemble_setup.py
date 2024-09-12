@@ -71,7 +71,7 @@ def main():
             )
             qf_run.run_fastfuels()
             qf_run.get_ignition()
-            qf_run.draw_ignition()
+            # qf_run.draw_ignition()
             qf_run.run_duet()
             qf_run.calibrate_duet()
             qf_run.modify_fuels()
@@ -89,7 +89,6 @@ class QuicfireRun:
         conditions,
         EPSG=5070,
         buffer=50,
-        burnplot_done=False,
         fastfuels_done=False,
         duet_done=False,
         severity_done=False,
@@ -105,7 +104,7 @@ class QuicfireRun:
         self.ignition_pace = 5
         # Paths
         self.fire_path = OG_PATH / fire_name
-        qf_name = f"{fire_name}_{site_name}"
+        qf_name = f"{site_name}"
         self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
         self.site_path = OG_PATH / fire_name / "Sample_Basins" / site_name
         # Filenames
@@ -124,6 +123,7 @@ class QuicfireRun:
         self.nx = self.fgrid_zarr.attrs["nx"] if fastfuels_done else None
         self.ny = self.fgrid_zarr.attrs["ny"] if fastfuels_done else None
         self.nz = self.fgrid_zarr.attrs["nz"] if fastfuels_done else None
+        self.nsp = self._find_nsp() if duet_done else None
         # Make dirs
         paths = [self.fire_path, self.qf_path, self.site_path]
         for p in paths:
@@ -209,19 +209,25 @@ class QuicfireRun:
     def modify_fuels(self):
         margins = _get_margin_indices((self.ny, self.nx), 25)
         rhof = _read_dat_file(
-            self.site_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
+            self.qf_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
         )
         height = _read_dat_file(
-            self.site_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
+            self.qf_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
         )
         moist = _read_dat_file(
-            self.site_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
+            self.qf_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
         )
 
         # Modify fuels in margins
-        rhof[0, :, :][margins] = self.conditions[0]
-        moist[0, :, :][margins] = self.conditions[1]
-        height[0, :, :][margins] = self.conditions[2]
+        margin_rhof = np.zeros((rhof.shape[1], rhof.shape[2]))
+        margin_rhof[margins] = self.conditions[0]
+        rhof[0, :, :] = np.maximum(rhof[0, :, :], margin_rhof)
+        margin_moist = np.ones((rhof.shape[1], rhof.shape[2]))
+        margin_moist[margins] = self.conditions[1]
+        moist[0, :, :] = np.minimum(moist[0, :, :], margin_moist)
+        margin_height = np.zeros((rhof.shape[1], rhof.shape[2]))
+        margin_height[margins] = self.conditions[2]
+        height[0, :, :] = np.maximum(height[0, :, :], margin_height)
 
         for z in range(1, moist.shape[0]):
             moist[z, :, :][margins] = 0.1  # canopy fuels 10% moisture in margins
@@ -235,9 +241,9 @@ class QuicfireRun:
         # plot_array(moist[0, :, :], f"modified moisture {self.margins}")
         # plot_array(height[0, :, :], f"modified height {self.margins}")
 
-        _write_array_to_dat(rhof, "treesrhof.dat", self.site_path, reshape=False)
-        _write_array_to_dat(moist, "treesmoist.dat", self.site_path, reshape=False)
-        _write_array_to_dat(height, "treesfueldepth.dat", self.site_path, reshape=False)
+        _write_array_to_dat(rhof, "treesrhof.dat", self.qf_path, reshape=False)
+        _write_array_to_dat(moist, "treesmoist.dat", self.qf_path, reshape=False)
+        _write_array_to_dat(height, "treesfueldepth.dat", self.qf_path, reshape=False)
 
     def correct_fuelheight(self):
         """Corrects the treesfueldepth.dat file by filling all non-surface layers with 1's"""
@@ -251,14 +257,20 @@ class QuicfireRun:
     def run_duet(self):
         if self.duet_done == False:
             self._copy_duet()
-            required = ["duet", "duet.in", "FIA_FastFuels_fin_fulllist_populated.txt"]
+            required = [
+                "duet_v2.0.1a_FF.exe",
+                "duet.in",
+                "FIA_FastFuels_fin_fulllist_populated.txt",
+            ]
             for file in required:
                 test_path = self.site_path / file
                 if not test_path.exists():
                     raise FileNotFoundError("run_duet: {} not found".format(file))
             # run DUET
             chdir(self.site_path)
-            with subprocess.Popen(["./duet"], stdout=subprocess.PIPE) as process:
+            with subprocess.Popen(
+                ["./duet_v2.0.1a_FF.exe"], stdout=subprocess.PIPE
+            ) as process:
 
                 def poll_and_read():
                     print(f"{process.stdout.read1().decode('utf-8')}")
@@ -273,6 +285,17 @@ class QuicfireRun:
                     print(f"Error: Poll = {process.poll()}")
                     exit(47)
             chdir(self.OG_PATH)
+            # delete unneeded duet files
+            to_delete = [
+                "canopy.dat",
+                "flattrees.dat",
+                "surface_rhof.dat",
+                "surface_ss_layered.dat",
+            ]
+            for file in to_delete:
+                Path(self.site_path / file).unlink()
+            # find nsp
+            self.nsp = self._find_nsp()
         else:
             print("DUET has already been run. To rerun, set self.duet_done to False")
 
@@ -291,7 +314,7 @@ class QuicfireRun:
         center_coords = np.array([self.ny / 2, self.nx / 2])
         new_wdir = _calculate_angle(low_coords, high_coords, center_coords)
         self.wind_dir = int(round(new_wdir))
-        plot_array(topo, f"{self.site_name} topo", save=None)
+        # plot_array(topo, f"{self.site_name} topo", save=None)
 
     def get_ignition(self):
         """
@@ -452,7 +475,7 @@ class QuicfireRun:
         print("ignite.dat written to {}".format(self.qf_path))
 
     def _copy_duet(self):
-        files = ["duet", "FIA_FastFuels_fin_fulllist_populated.txt"]
+        files = ["duet_v2.0.1a_FF.exe", "FIA_FastFuels_fin_fulllist_populated.txt"]
         for file in files:
             src = self.OG_PATH / "Duet" / file
             dst = self.site_path / file
@@ -461,6 +484,13 @@ class QuicfireRun:
                     "run_duet: {} not found in Duet directory".format(file)
                 )
             copy(src, dst)
+
+    def _find_nsp(self) -> int:
+        species = []
+        with open(self.site_path / "surface_species.dat", "r") as file:
+            for line in file:
+                species.append(line.strip())
+        return len(species) + 1
 
     def calibrate_duet(self):
         xmin, xmax, ymin, ymax = (
@@ -475,18 +505,10 @@ class QuicfireRun:
             [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)]
         )
 
-        duet_run = duet.import_duet(self.site_path, self.nx, self.ny)
-        duet_run.add_moisture_array(duet_run.density)
-        print(self.qf_path)
+        duet_run = duet.import_duet(self.site_path, self.nx, self.ny, self.nsp)
         query = duet.query_landfire(
             area_of_interest=bbox, directory=self.site_path, input_epsg=5070
         )
-        # quick fix for weird duet grass height array
-        for z in [0, 1]:
-            if np.max(duet_run.height[z, :, :]) == np.min(
-                duet_run.height[z, :, :][duet_run.height[z, :, :] > 0]
-            ):
-                duet_run.height[z, :, :] = duet_run.density[z, :, :]
         try:
             grass_density = duet.assign_targets_from_sb40(query, "grass", "density")
             grass_height = duet.assign_targets_from_sb40(query, "grass", "height")
@@ -530,7 +552,11 @@ class QuicfireRun:
             self.site_path, "treesmoist.dat", arr_dim=(self.nz, self.ny, self.nx)
         )
         # plot_array(treesrhof[0, :, :], "treesrhof fastfuels")
-        # plot_array(duet_density, "calibrated rhof")
+        # plot_array(treesmoist[0, :, :], "treesmoist fastfuels")
+        # plot_array(treesfueldepth[0, :, :], "treesfueldepth fastfuels")
+        # plot_array(duet_density, "calibrated density")
+        # plot_array(duet_moisture, "calibrated moisture")
+        # plot_array(duet_height, "calibrated height")
         treesrhof[0, :, :] = duet_density
         treesfueldepth[0, :, :] = duet_height
         treesmoist[0, :, :] = duet_moisture
