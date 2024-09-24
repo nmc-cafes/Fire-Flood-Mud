@@ -52,7 +52,7 @@ def main():
     conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i >= 0:
+        if i >= 98:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             site_coords = fire_gdf.iloc[i]["geometry"]

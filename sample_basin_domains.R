@@ -49,7 +49,7 @@ for(fire in fires){
 
 # Check the result
 test_fire <- "Caldor"
-test_num <- 1
+test_num <- 5
 test_name <- paste0(substr(test_fire, start = 1, stop = 3),test_num)
 test_basins <- vect(here(test_fire,paste0(test_fire,"_sample_basins.shp")))
 test_basin <- test_basins[test_num, ]
