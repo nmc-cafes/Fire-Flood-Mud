@@ -24,15 +24,25 @@ def plot_array(x: np.ndarray, title: str):
 
 
 HERE = Path(__file__).parent
-runpath = HERE / "QF_runs" / "Moisture_Sensitivity" / "Dix5_mod"
+runpath = HERE / "QF_runs" / "Moisture_Sensitivity" / "Cal5"
+sim = SimulationOutputs(runpath / "Output", nz=84, nx=333, ny=295)
 
-
-sim = SimulationOutputs(runpath / "Output", nz=84, nx=411, ny=282)
+# runpath = HERE / "QF_runs" / "Moisture_Sensitivity" / "Dix5"
+# sim = SimulationOutputs(runpath / "Output", nz=81, nx=411, ny=282)
 dens = sim.get_output("fuels-dens")
-dens_init = dens.to_numpy(timestep=0)
+# dens_init = dens.to_numpy(timestep=0)
 dens_final = dens.to_numpy(timestep=len(dens.times) - 1)
+dens_init = dens.to_numpy(timestep=0)
 
-plot_array(dens_final[0, 0, :, :], "current fuel density")
+plot_array(dens_final[0, 0, :, :], "current surface fuel density")
+
+canopy_init = np.sum(dens_init[0, 1:, :, :], axis=0)
+canopy_final = np.sum(dens_final[0, 1:, :, :], axis=0)
+canopy_remain = np.full(canopy_init.shape, -0.25)
+canopy_remain[np.where(canopy_init > 0)] = (
+    canopy_final[np.where(canopy_init > 0)] / canopy_init[np.where(canopy_init > 0)]
+)
+plot_array(canopy_remain, "current canopy fuel density")
 
 # dens_init_surf = np.sum(dens_init[0, 0, :, :])
 # dens_init_trees = np.sum(dens_init[0, 1:, :, :])
