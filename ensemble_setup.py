@@ -10,7 +10,6 @@ from os import environ
 from pathlib import Path
 import math
 from shutil import copy
-from datetime import datetime
 import subprocess
 from os import chdir
 from time import sleep
@@ -26,7 +25,6 @@ import pylab
 import zarr
 import json
 from shapely import Polygon
-from meteostat import Point, Daily
 from scipy.io import FortranFile
 
 environ["FASTFUELS_API_KEY"] = "sxk-b78b909a-383c-4972-b480-749f9f926a4b"
@@ -68,6 +66,7 @@ def main():
                 conditions,
                 fastfuels_done=True,
                 duet_done=True,
+                query_done=True,
             )
             qf_run.run_fastfuels()
             qf_run.get_ignition_doubleline()
@@ -92,6 +91,7 @@ class QuicfireRun:
         fastfuels_done=False,
         duet_done=False,
         severity_done=False,
+        query_done=False,
     ):
         OG_PATH = og_path
         self.OG_PATH = OG_PATH
@@ -116,9 +116,10 @@ class QuicfireRun:
         self.fastfuels_done = fastfuels_done
         self.duet_done = duet_done
         self.severity_done = severity_done
+        self.query_done = query_done
         # Calculated
         self.wind_dir = None
-        self.wind_speed = 10
+        self.wind_speed = 8
         self.ignition_coords = None
         self.fgrid_zarr = self._import_fgrid_zarr() if fastfuels_done else None
         self.nx = self.fgrid_zarr.attrs["nx"] if fastfuels_done else None
@@ -203,12 +204,6 @@ class QuicfireRun:
             print(
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
             )
-            # fg = zarr.open(
-            #     self.site_path / f"{self.site_name}_fastfuels.zarr", mode="r"
-            # )
-            # self.nx = fg.attrs["nx"]
-            # self.ny = fg.attrs["ny"]
-            # self.nz = fg.attrs["nz"]
 
     def modify_fuels(self):
         margins = _get_margin_indices((self.ny, self.nx), 25)
@@ -248,15 +243,6 @@ class QuicfireRun:
         _write_array_to_dat(rhof, "treesrhof.dat", self.qf_path, reshape=False)
         _write_array_to_dat(moist, "treesmoist.dat", self.qf_path, reshape=False)
         _write_array_to_dat(height, "treesfueldepth.dat", self.qf_path, reshape=False)
-
-    def correct_fuelheight(self):
-        """Corrects the treesfueldepth.dat file by filling all non-surface layers with 1's"""
-
-        height = _read_dat_file(
-            self.site_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
-        )
-        height[1:, :, :] = 1.0
-        _write_array_to_dat(height, "treesfueldepth.dat", self.site_path, reshape=False)
 
     def run_duet(self):
         if self.duet_done == False:
@@ -445,7 +431,7 @@ class QuicfireRun:
             fire_nz=self.nz,
             wind_speed=self.wind_speed,
             wind_direction=self.wind_dir,
-            simulation_time=7200,
+            simulation_time=10800,
         )
         sim.set_custom_simulation()
         sim.set_output_files(
@@ -554,37 +540,45 @@ class QuicfireRun:
         )
 
         duet_run = duet.import_duet(self.site_path, self.nx, self.ny, self.nsp)
-        query = duet.query_landfire(
-            area_of_interest=bbox, directory=self.site_path, input_epsg=5070
-        )
-        try:
-            grass_density = duet.assign_targets_from_sb40(query, "grass", "density")
-            grass_height = duet.assign_targets_from_sb40(query, "grass", "height")
-            grass_moisture = duet.assign_targets_from_sb40(query, "grass", "moisture")
-            density_targets = duet.set_density(grass=grass_density)
-            height_targets = duet.set_height(grass=grass_height)
-            moisture_targets = duet.set_moisture(grass=grass_moisture)
-            calibrated_grass = duet.calibrate(
-                duet_run, [density_targets, height_targets, moisture_targets]
+        if self.query_done == False:
+            query = duet.query_landfire(
+                area_of_interest=bbox, directory=self.site_path, input_epsg=5070
             )
-        except ValueError:
-            print("No grass at sample site. Continuing with litter only.")
-            calibrated_grass = duet_run
-            pass
-        try:
-            litter_density = duet.assign_targets_from_sb40(query, "litter", "density")
-            litter_height = duet.assign_targets_from_sb40(query, "litter", "height")
-            litter_moisture = duet.assign_targets_from_sb40(query, "litter", "moisture")
-            density_targets = duet.set_density(litter=litter_density)
-            height_targets = duet.set_height(litter=litter_height)
-            moisture_targets = duet.set_moisture(litter=litter_moisture)
-            calibrated_litter = duet.calibrate(
-                calibrated_grass, [density_targets, height_targets, moisture_targets]
-            )
-        except ValueError:
-            print("No litter at sample site. Continuing with grass only.")
-            calibrated_litter = calibrated_grass
-            pass
+            try:
+                grass_density = duet.assign_targets_from_sb40(query, "grass", "density")
+                grass_height = duet.assign_targets_from_sb40(query, "grass", "height")
+                grass_moisture = duet.assign_targets_from_sb40(
+                    query, "grass", "moisture"
+                )
+                density_targets = duet.set_density(grass=grass_density)
+                height_targets = duet.set_height(grass=grass_height)
+                moisture_targets = duet.set_moisture(grass=grass_moisture)
+                calibrated_grass = duet.calibrate(
+                    duet_run, [density_targets, height_targets, moisture_targets]
+                )
+            except ValueError:
+                print("No grass at sample site. Continuing with litter only.")
+                calibrated_grass = duet_run
+                pass
+            try:
+                litter_density = duet.assign_targets_from_sb40(
+                    query, "litter", "density"
+                )
+                litter_height = duet.assign_targets_from_sb40(query, "litter", "height")
+                litter_moisture = duet.assign_targets_from_sb40(
+                    query, "litter", "moisture"
+                )
+                density_targets = duet.set_density(litter=litter_density)
+                height_targets = duet.set_height(litter=litter_height)
+                moisture_targets = duet.set_moisture(litter=litter_moisture)
+                calibrated_litter = duet.calibrate(
+                    calibrated_grass,
+                    [density_targets, height_targets, moisture_targets],
+                )
+            except ValueError:
+                print("No litter at sample site. Continuing with grass only.")
+                calibrated_litter = calibrated_grass
+                pass
 
         duet_density = calibrated_litter.to_numpy("integrated", "density")
         duet_height = calibrated_litter.to_numpy("integrated", "height")
@@ -621,32 +615,6 @@ class QuicfireRun:
         zarr_path = self.site_path / self.mutable_name
         zroot = zarr.open(zarr_path, mode="r")
         return zroot
-
-    def _meteostat(self):
-        sites = self.fire_path / (self.fire_name + "_sample_sites_NJT.shp")
-        sample_sites = gpd.read_file(sites).to_crs(4326)
-        center = sample_sites[
-            sample_sites["Site_Name"] == self.site_name
-        ].centroid.to_crs(4326)
-        id = sample_sites.index[sample_sites["Site_Name"] == self.site_name].tolist()[0]
-        plot = Point(center[id].y, center[id].x)
-        plot.radius = 60000
-
-        # from meteostat import Stations
-        # stations = Stations()
-        # stations = stations.nearby(center[id].y, center[id].x)
-        # station = stations.fetch(1)
-        # print(station)
-
-        # Set time period
-        start = datetime.strptime(self.fire_date, "%Y-%m-%d")
-        end = datetime.strptime(self.fire_date, "%Y-%m-%d")
-
-        # Get daily data
-        data = Daily(plot, start, end)
-        data = data.fetch()
-
-        return data.wspd[0]
 
     def _draw_arrow(self, arrow_length=25):
         start_x = self.nx / 2
