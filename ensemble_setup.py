@@ -52,7 +52,7 @@ def main():
     conditions = [1.0, 0.05, 1.0]
 
     for i in range(len(fire_gdf.index)):
-        if i >= 98:
+        if i == 24:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             site_coords = fire_gdf.iloc[i]["geometry"]
@@ -66,15 +66,15 @@ def main():
                 site_coords,
                 og_path,
                 conditions,
-                fastfuels_done=False,
-                duet_done=False,
+                fastfuels_done=True,
+                duet_done=True,
             )
             qf_run.run_fastfuels()
-            qf_run.get_ignition()
-            # qf_run.draw_ignition()
+            qf_run.get_ignition_doubleline()
+            qf_run.draw_ignition()
             qf_run.run_duet()
             qf_run.calibrate_duet()
-            qf_run.modify_fuels()
+            # qf_run.modify_fuels()
             qf_run.quicfire_simulation()
 
 
@@ -102,6 +102,7 @@ class QuicfireRun:
         self.buffer = buffer
         self.conditions = conditions
         self.ignition_pace = 5
+        self.ignition_length = 200
         # Paths
         self.fire_path = OG_PATH / fire_name
         qf_name = f"{site_name}"
@@ -187,9 +188,6 @@ class QuicfireRun:
             self.nz = zroot.attrs["nz"]
             self.fgrid_zarr = zarr_mutable
 
-            # Get new wind direction from the fastfuels topo file
-            self.new_wdir_from_topo()
-
             fastfuels.export_zarr_to_duet(
                 zroot,
                 self.site_path,
@@ -205,6 +203,12 @@ class QuicfireRun:
             print(
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
             )
+            # fg = zarr.open(
+            #     self.site_path / f"{self.site_name}_fastfuels.zarr", mode="r"
+            # )
+            # self.nx = fg.attrs["nx"]
+            # self.ny = fg.attrs["ny"]
+            # self.nz = fg.attrs["nz"]
 
     def modify_fuels(self):
         margins = _get_margin_indices((self.ny, self.nx), 25)
@@ -316,7 +320,7 @@ class QuicfireRun:
         self.wind_dir = int(round(new_wdir))
         # plot_array(topo, f"{self.site_name} topo", save=None)
 
-    def get_ignition(self):
+    def get_ignition_singleline(self):
         """
         Generate an ignition line based on wind direction that resides outside of
         the buffer zone and is perpendicular to the wind direction.
@@ -325,6 +329,8 @@ class QuicfireRun:
             raise Exception(
                 "get_ignition: FastFuels must be run before ignitions can be calculated"
             )
+        # Get new wind direction from the fastfuels topo file
+        self.new_wdir_from_topo()
         # Get coordinates of buffer corner nearest to wind direction
         if self.wind_dir < 90:
             x1, y1 = (self.nx * 2 - self.buffer, self.ny * 2 - self.buffer)
@@ -353,7 +359,46 @@ class QuicfireRun:
         start = _percent_along_line(*border_intersections, perc=0.1)
         end = _percent_along_line(*switched, perc=0.1)
 
-        self.ignition_coords = [start, end]
+        self.ignition_coords = [(start, end)]
+        self._write_ignite()
+
+    def get_ignition_doubleline(self):
+        """
+        Make two diverging ignition lines that start at the corner that corresponds
+        to where the wind is coming from. Then, they will diverge along each side,
+        with each ignition length corresponding to the percent that the angle is
+        closer to. This way, ignition lines will always add up to 100m (or whatever
+        I decide to set it to)
+        """
+        if not self.fastfuels_done:
+            raise Exception(
+                "get_ignition: FastFuels must be run before ignitions can be calculated"
+            )
+        # Get new wind direction from the fastfuels topo file
+        self.new_wdir_from_topo()
+        # Get coordinates of buffer corner nearest to wind direction
+        # subtract half the buffer. This will be the ignition starting point
+        if self.wind_dir < 90:
+            x1, y1 = (self.nx * 2 - self.buffer / 2, self.ny * 2 - self.buffer / 2)
+            y_len = (25 + round(self.wind_dir / 90 * self.ignition_length)) * -1
+            x_len = (25 + round((90 - self.wind_dir) / 90 * self.ignition_length)) * -1
+        elif self.wind_dir < 180:
+            x1, y1 = (self.nx * 2 - self.buffer / 2, self.buffer / 2)
+            y_len = 25 + round((180 - self.wind_dir) / 90 * self.ignition_length)
+            x_len = (25 + round((self.wind_dir - 90) / 90 * self.ignition_length)) * -1
+        elif self.wind_dir < 270:
+            x1, y1 = (self.buffer / 2, self.buffer / 2)
+            y_len = 25 + round((self.wind_dir - 180) / 90 * self.ignition_length)
+            x_len = 25 + round((270 - self.wind_dir) / 90 * self.ignition_length)
+        else:
+            x1, y1 = (self.buffer / 2, self.ny * 2 - self.buffer / 2)
+            y_len = (25 + round((360 - self.wind_dir) / 90 * self.ignition_length)) * -1
+            x_len = 25 + round((self.wind_dir - 270) / 90 * self.ignition_length)
+
+        self.ignition_coords = [
+            ((x1, y1), (x1, y1 + y_len)),
+            ((x1, y1), (x1 + x_len, y1)),
+        ]
         self._write_ignite()
 
     def draw_ignition(self):
@@ -369,13 +414,15 @@ class QuicfireRun:
             raise Exception(
                 "draw_ignition: Ignitions coordinates must be calculated before they can be drawn"
             )
-        start_loc, end_loc = self.ignition_coords
+
         fig, ax = plt.subplots()
-        plt.plot(
-            [start_loc[0] / 2, end_loc[0] / 2],
-            [start_loc[1] / 2, end_loc[1] / 2],
-            "ro-",
-        )
+        for line in range(len(self.ignition_coords)):
+            start_loc, end_loc = self.ignition_coords[line]
+            plt.plot(
+                [start_loc[0] / 2, end_loc[0] / 2],
+                [start_loc[1] / 2, end_loc[1] / 2],
+                "ro-",
+            )
         plt.xlim(0, self.nx)
         plt.ylim(0, self.ny)
         ax.set_aspect("equal")
@@ -457,21 +504,22 @@ class QuicfireRun:
         None. Writes ignite.dat
 
         """
-        start_loc, end_loc = self.ignition_coords
-        duration = _ignition_duration(start_loc, end_loc, self.ignition_pace)
         ignite_path = self.site_path / "ignite.dat"
         with open(ignite_path, "w") as file:
             file.write("igntype=5\n")
             file.write("&atvlist\n")
-            file.write("natv=1\n")
+            file.write(f"natv={len(self.ignition_coords)}\n")
             file.write("targettemp=1000.0\n")
             file.write("flamedistance=4.00\n")
             file.write("/\n")
-            file.write(
-                "{} {} {} {} {} {}\n".format(
-                    start_loc[0], start_loc[1], end_loc[0], end_loc[1], 0, duration
+            for line in range(len(self.ignition_coords)):
+                start_loc, end_loc = self.ignition_coords[line]
+                duration = _ignition_duration(start_loc, end_loc, self.ignition_pace)
+                file.write(
+                    "{} {} {} {} {} {}\n".format(
+                        start_loc[0], start_loc[1], end_loc[0], end_loc[1], 0, duration
+                    )
                 )
-            )
         print("ignite.dat written to {}".format(self.qf_path))
 
     def _copy_duet(self):
