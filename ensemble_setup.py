@@ -57,7 +57,7 @@ def main():
     }
 
     for i in range(len(fire_gdf.index)):
-        if i == 24:
+        if i >= 0:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             site_coords = fire_gdf.iloc[i]["geometry"]
@@ -75,16 +75,16 @@ def main():
                 fastfuels_done=True,
                 duet_done=True,
                 calibration_done=True,
+                check_inputs=False,
+                write_test_sim=False,
             )
             qf_run.run_fastfuels()
             qf_run.get_ignition_doubleline()
-            qf_run.draw_ignition()
             qf_run.run_duet()
             qf_run.calibrate_duet_from_landfire()
             qf_run.calibrate_moisture()
-            # qf_run.modify_fuels()
+            qf_run.modify_fuels()
             qf_run.quicfire_simulation()
-            qf_run.check_inputs()
 
 
 class QuicfireRun:
@@ -103,6 +103,8 @@ class QuicfireRun:
         duet_done=False,
         severity_done=False,
         calibration_done=False,
+        check_inputs=False,
+        write_test_sim=False,
     ):
         OG_PATH = og_path
         self.OG_PATH: Path = OG_PATH
@@ -138,6 +140,9 @@ class QuicfireRun:
         self.ny = self.fgrid_zarr.attrs["ny"] if fastfuels_done else None
         self.nz = self.fgrid_zarr.attrs["nz"] if fastfuels_done else None
         self.nsp = self._find_nsp() if duet_done else None
+        # Test
+        self.check_inputs = check_inputs
+        self.write_test_sim = write_test_sim
         # Make dirs
         paths = [self.fire_path, self.qf_path, self.site_path]
         for p in paths:
@@ -381,7 +386,7 @@ class QuicfireRun:
             print("DUET has already been run. To rerun, set self.duet_done to False")
 
     def calibrate_duet_from_landfire(self):
-        if self.calibration_done:
+        if self.calibration_done == False:
             xmin, xmax, ymin, ymax = (
                 self.fgrid_zarr.attrs["xmin"],
                 self.fgrid_zarr.attrs["xmax"],
@@ -568,23 +573,29 @@ class QuicfireRun:
             src = self.site_path / file
             dst = self.qf_path / file
             copy(src, dst)
-        # exe
-        exe_src = Path(
-            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/exe/quicfire_MACI.exe"
-        )
-        exe_dst = self.qf_path / "quicfire_MACI.exe"
-        copy(exe_src, exe_dst)
-        # drawfire
-        drawfire_dir = Path(
-            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3/quicfire_vis"
-        )
-        drawfire = []
-        for file in drawfire_dir.iterdir():
-            drawfire.append(file.name)
-        for file in drawfire:
-            src = drawfire_dir / file
-            dst = self.qf_path / file
-            copy(src, dst)
+
+        if self.write_test_sim:
+            self._json_to_test_qf_run()
+            # exe
+            exe_src = Path(
+                "/Users/ntutland/Documents/Quicfire/QF_6.0.0/exe/quicfire_MACI.exe"
+            )
+            exe_dst = self.qf_path / "quicfire_MACI.exe"
+            copy(exe_src, exe_dst)
+            # drawfire
+            drawfire_dir = Path(
+                "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3/quicfire_vis"
+            )
+            drawfire = []
+            for file in drawfire_dir.iterdir():
+                drawfire.append(file.name)
+            for file in drawfire:
+                src = drawfire_dir / file
+                dst = self.qf_path / file
+                copy(src, dst)
+
+        if self.check_inputs:
+            self._check_inputs()
 
     def _wdir_from_topo(self):
         topo = _read_dat_file(
@@ -675,7 +686,7 @@ class QuicfireRun:
             length_includes_head=True,
         )
 
-    def check_inputs(self):
+    def _check_inputs(self):
         treesrhof = _read_dat_file(
             self.qf_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
         )
@@ -689,9 +700,29 @@ class QuicfireRun:
         plot_array(treesmoist[0, :, :], "surface moist")
         plot_array(treesfueldepth[0, :, :], "surface fuel depth")
 
-        with open(self.qf_path / "ignite.dat") as file:
-            for line in file:
-                print(line)
+        canopy = np.sum(treesrhof[1:, :, :], axis=0)
+        canopy[canopy == 0] = -25
+        plot_array(canopy, "canopy rhof (no fuel= -25)")
+
+        self.draw_ignition()
+        # with open(self.qf_path / "ignite.dat") as file:
+        #     for line in file:
+        #         print(line)
+
+        print(
+            f"Dimensions from fastfuels: nx = {self.nx}, ny = {self.ny}, nz = {self.nz}"
+        )
+
+        # sim = qft.SimulationInputs.from_json(self.qf_path / f"{self.site_name}.json")
+        # print(
+        #     f"Dimensions in quicfire run: nx = {sim.qu_simparams.nx}, "
+        #     f"ny = {sim.qu_simparams.ny}, nz = {sim.quic_fire.nz}"
+        # )
+
+    def _json_to_test_qf_run(self):
+        sim = qft.SimulationInputs.from_json(self.qf_path / f"{self.site_name}.json")
+        sim.set_output_files(fuel_dens=True)
+        sim.write_inputs(self.qf_path)
 
 
 def _read_dat_file(
