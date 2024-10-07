@@ -84,6 +84,7 @@ def main():
             qf_run.calibrate_moisture()
             # qf_run.modify_fuels()
             qf_run.quicfire_simulation()
+            qf_run.check_inputs()
 
 
 class QuicfireRun:
@@ -673,6 +674,24 @@ class QuicfireRun:
             head_length=width * 3,
             length_includes_head=True,
         )
+
+    def check_inputs(self):
+        treesrhof = _read_dat_file(
+            self.qf_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
+        )
+        treesmoist = _read_dat_file(
+            self.qf_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
+        )
+        treesfueldepth = _read_dat_file(
+            self.qf_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
+        )
+        plot_array(treesrhof[0, :, :], "surface rhof")
+        plot_array(treesmoist[0, :, :], "surface moist")
+        plot_array(treesfueldepth[0, :, :], "surface fuel depth")
+
+        with open(self.qf_path / "ignite.dat") as file:
+            for line in file:
+                print(line)
 
 
 def _read_dat_file(
