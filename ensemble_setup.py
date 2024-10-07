@@ -216,68 +216,6 @@ class QuicfireRun:
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
             )
 
-    def run_duet(self):
-        if self.duet_done == False:
-            self._copy_duet()
-            required = [
-                "duet_v2.0.1a_FF.exe",
-                "duet.in",
-                "FIA_FastFuels_fin_fulllist_populated.txt",
-            ]
-            for file in required:
-                test_path = self.site_path / file
-                if not test_path.exists():
-                    raise FileNotFoundError("run_duet: {} not found".format(file))
-            # run DUET
-            chdir(self.site_path)
-            with subprocess.Popen(
-                ["./duet_v2.0.1a_FF.exe"], stdout=subprocess.PIPE
-            ) as process:
-
-                def poll_and_read():
-                    print(f"{process.stdout.read1().decode('utf-8')}")
-
-                while process.poll() not in [0, -10, -11]:
-                    poll_and_read()
-                    print(f"{process.poll()}")
-                    sleep(1)
-                if process.poll() in [0, -10, -11]:
-                    print(f"DUET run successfully (Exit poll: {process.poll()})")
-                else:
-                    print(f"Error: Poll = {process.poll()}")
-                    exit(47)
-            chdir(self.OG_PATH)
-            # delete unneeded duet files
-            to_delete = [
-                "canopy.dat",
-                "flattrees.dat",
-                "surface_rhof.dat",
-                "surface_ss_layered.dat",
-            ]
-            for file in to_delete:
-                Path(self.site_path / file).unlink()
-            # find nsp
-            self.nsp = self._find_nsp()
-        else:
-            print("DUET has already been run. To rerun, set self.duet_done to False")
-
-    def new_wdir_from_topo(self):
-        topo = _read_dat_file(
-            self.site_path,
-            "topo.dat",
-            arr_dim=(1, self.ny, self.nx),
-            order="C",
-        )
-        topo = topo[0, :, :]
-        lowpoint = np.where(topo == np.min(topo))
-        highpoint = np.where(topo == np.max(topo))
-        low_coords = np.array([lowpoint[0][0], lowpoint[1][0]])
-        high_coords = np.array([highpoint[0][0], highpoint[1][0]])
-        center_coords = np.array([self.ny / 2, self.nx / 2])
-        new_wdir = _calculate_angle(low_coords, high_coords, center_coords)
-        self.wind_dir = int(round(new_wdir))
-        # plot_array(topo, f"{self.site_name} topo", save=None)
-
     def get_ignition_singleline(self):
         """
         Generate an ignition line based on wind direction that resides outside of
@@ -287,8 +225,8 @@ class QuicfireRun:
             raise Exception(
                 "get_ignition: FastFuels must be run before ignitions can be calculated"
             )
-        # Get new wind direction from the fastfuels topo file
-        self.new_wdir_from_topo()
+        # Get wind direction from the fastfuels topo file
+        self._wdir_from_topo()
         # Get coordinates of buffer corner nearest to wind direction
         if self.wind_dir < 90:
             x1, y1 = (self.nx * 2 - self.buffer, self.ny * 2 - self.buffer)
@@ -332,8 +270,8 @@ class QuicfireRun:
             raise Exception(
                 "get_ignition: FastFuels must be run before ignitions can be calculated"
             )
-        # Get new wind direction from the fastfuels topo file
-        self.new_wdir_from_topo()
+        # Get wind direction from the fastfuels topo file
+        self._wdir_from_topo()
         # Get coordinates of buffer corner nearest to wind direction
         # subtract half the buffer. This will be the ignition starting point
         if self.wind_dir < 90:
@@ -396,107 +334,50 @@ class QuicfireRun:
         self._draw_arrow()
         plt.show()
 
-    def quicfire_simulation(self):
-        sim = qft.SimulationInputs.create_simulation(
-            self.nx,
-            self.ny,
-            fire_nz=self.nz,
-            wind_speed=self.wind_speed,
-            wind_direction=self.wind_dir,
-            simulation_time=10800,
-        )
-        sim.set_custom_simulation()
-        sim.set_output_files(
-            react_rate=True,
-            fuel_dens=True,
-            fuel_moist=True,
-            mass_burnt=True,
-            radiation=True,
-            surf_eng=True,
-        )
-        sim.quic_fire.fuel_density_flag = 4
-        sim.quic_fire.fuel_moisture_flag = 4
-        sim.quic_fire.ignitions_per_cell = 5
-        sim.quic_fire.auto_kill = 1
-        sim.qu_simparams.quic_domain_height = 1800
+    def run_duet(self):
+        if self.duet_done == False:
+            self._copy_duet()
+            required = [
+                "duet_v2.0.1a_FF.exe",
+                "duet.in",
+                "FIA_FastFuels_fin_fulllist_populated.txt",
+            ]
+            for file in required:
+                test_path = self.site_path / file
+                if not test_path.exists():
+                    raise FileNotFoundError("run_duet: {} not found".format(file))
+            # run DUET
+            chdir(self.site_path)
+            with subprocess.Popen(
+                ["./duet_v2.0.1a_FF.exe"], stdout=subprocess.PIPE
+            ) as process:
 
-        # assemble ensemble
-        self.qf_path.mkdir(exist_ok=True)
-        sim.to_json(self.qf_path / f"{self.site_name}.json")
+                def poll_and_read():
+                    print(f"{process.stdout.read1().decode('utf-8')}")
 
-        # copy dat files and exe
-        # dat files
-        dat_files = [
-            "ignite.dat",
-            "topo.dat",
-        ]
-        for file in dat_files:
-            src = self.site_path / file
-            dst = self.qf_path / file
-            copy(src, dst)
-        # exe
-        exe_src = Path(
-            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/exe/quicfire_MACI.exe"
-        )
-        exe_dst = self.qf_path / "quicfire_MACI.exe"
-        copy(exe_src, exe_dst)
-        # drawfire
-        drawfire_dir = Path(
-            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3/quicfire_vis"
-        )
-        drawfire = []
-        for file in drawfire_dir.iterdir():
-            drawfire.append(file.name)
-        for file in drawfire:
-            src = drawfire_dir / file
-            dst = self.qf_path / file
-            copy(src, dst)
-
-    def _write_ignite(self):
-        """
-        Write an ignite.dat file to the QUIC-Fire run directory.
-        Ignition location is based on the average wind direction on the day of the fire.
-
-        Returns
-        -------
-        None. Writes ignite.dat
-
-        """
-        ignite_path = self.site_path / "ignite.dat"
-        with open(ignite_path, "w") as file:
-            file.write("igntype=5\n")
-            file.write("&atvlist\n")
-            file.write(f"natv={len(self.ignition_coords)}\n")
-            file.write("targettemp=1000.0\n")
-            file.write("flamedistance=4.00\n")
-            file.write("/\n")
-            for line in range(len(self.ignition_coords)):
-                start_loc, end_loc = self.ignition_coords[line]
-                duration = _ignition_duration(start_loc, end_loc, self.ignition_pace)
-                file.write(
-                    "{} {} {} {} {} {}\n".format(
-                        start_loc[0], start_loc[1], end_loc[0], end_loc[1], 0, duration
-                    )
-                )
-        print("ignite.dat written to {}".format(self.qf_path))
-
-    def _copy_duet(self):
-        files = ["duet_v2.0.1a_FF.exe", "FIA_FastFuels_fin_fulllist_populated.txt"]
-        for file in files:
-            src = self.OG_PATH / "Duet" / file
-            dst = self.site_path / file
-            if not src.exists():
-                raise FileNotFoundError(
-                    "run_duet: {} not found in Duet directory".format(file)
-                )
-            copy(src, dst)
-
-    def _find_nsp(self) -> int:
-        species = []
-        with open(self.site_path / "surface_species.dat", "r") as file:
-            for line in file:
-                species.append(line.strip())
-        return len(species) + 1
+                while process.poll() not in [0, -10, -11]:
+                    poll_and_read()
+                    print(f"{process.poll()}")
+                    sleep(1)
+                if process.poll() in [0, -10, -11]:
+                    print(f"DUET run successfully (Exit poll: {process.poll()})")
+                else:
+                    print(f"Error: Poll = {process.poll()}")
+                    exit(47)
+            chdir(self.OG_PATH)
+            # delete unneeded duet files
+            to_delete = [
+                "canopy.dat",
+                "flattrees.dat",
+                "surface_rhof.dat",
+                "surface_ss_layered.dat",
+            ]
+            for file in to_delete:
+                Path(self.site_path / file).unlink()
+            # find nsp
+            self.nsp = self._find_nsp()
+        else:
+            print("DUET has already been run. To rerun, set self.duet_done to False")
 
     def calibrate_duet_from_landfire(self):
         if self.calibration_done:
@@ -609,7 +490,7 @@ class QuicfireRun:
         ff_moist[0, :, :] = calibrated_moisture
         _write_array_to_dat(ff_moist, "treesmoist.dat", self.qf_path, reshape=False)
 
-def modify_fuels(self):
+    def modify_fuels(self):
         margins = _get_margin_indices((self.ny, self.nx), 25)
         rhof = _read_dat_file(
             self.qf_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
@@ -647,6 +528,125 @@ def modify_fuels(self):
         _write_array_to_dat(rhof, "treesrhof.dat", self.qf_path, reshape=False)
         _write_array_to_dat(moist, "treesmoist.dat", self.qf_path, reshape=False)
         _write_array_to_dat(height, "treesfueldepth.dat", self.qf_path, reshape=False)
+
+    def quicfire_simulation(self):
+        sim = qft.SimulationInputs.create_simulation(
+            self.nx,
+            self.ny,
+            fire_nz=self.nz,
+            wind_speed=self.wind_speed,
+            wind_direction=self.wind_dir,
+            simulation_time=10800,
+        )
+        sim.set_custom_simulation()
+        sim.set_output_files(
+            react_rate=True,
+            fuel_dens=True,
+            fuel_moist=True,
+            mass_burnt=True,
+            radiation=True,
+            surf_eng=True,
+        )
+        sim.quic_fire.fuel_density_flag = 4
+        sim.quic_fire.fuel_moisture_flag = 4
+        sim.quic_fire.ignitions_per_cell = 5
+        sim.quic_fire.auto_kill = 1
+        sim.qu_simparams.quic_domain_height = 1800
+
+        # assemble ensemble
+        self.qf_path.mkdir(exist_ok=True)
+        sim.to_json(self.qf_path / f"{self.site_name}.json")
+
+        # copy dat files and exe
+        # dat files
+        dat_files = [
+            "ignite.dat",
+            "topo.dat",
+        ]
+        for file in dat_files:
+            src = self.site_path / file
+            dst = self.qf_path / file
+            copy(src, dst)
+        # exe
+        exe_src = Path(
+            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/exe/quicfire_MACI.exe"
+        )
+        exe_dst = self.qf_path / "quicfire_MACI.exe"
+        copy(exe_src, exe_dst)
+        # drawfire
+        drawfire_dir = Path(
+            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3/quicfire_vis"
+        )
+        drawfire = []
+        for file in drawfire_dir.iterdir():
+            drawfire.append(file.name)
+        for file in drawfire:
+            src = drawfire_dir / file
+            dst = self.qf_path / file
+            copy(src, dst)
+
+    def _wdir_from_topo(self):
+        topo = _read_dat_file(
+            self.site_path,
+            "topo.dat",
+            arr_dim=(1, self.ny, self.nx),
+            order="C",
+        )
+        topo = topo[0, :, :]
+        lowpoint = np.where(topo == np.min(topo))
+        highpoint = np.where(topo == np.max(topo))
+        low_coords = np.array([lowpoint[0][0], lowpoint[1][0]])
+        high_coords = np.array([highpoint[0][0], highpoint[1][0]])
+        center_coords = np.array([self.ny / 2, self.nx / 2])
+        new_wdir = _calculate_angle(low_coords, high_coords, center_coords)
+        self.wind_dir = int(round(new_wdir))
+        # plot_array(topo, f"{self.site_name} topo", save=None)
+
+    def _write_ignite(self):
+        """
+        Write an ignite.dat file to the QUIC-Fire run directory.
+        Ignition location is based on the average wind direction on the day of the fire.
+
+        Returns
+        -------
+        None. Writes ignite.dat
+
+        """
+        ignite_path = self.site_path / "ignite.dat"
+        with open(ignite_path, "w") as file:
+            file.write("igntype=5\n")
+            file.write("&atvlist\n")
+            file.write(f"natv={len(self.ignition_coords)}\n")
+            file.write("targettemp=1000.0\n")
+            file.write("flamedistance=4.00\n")
+            file.write("/\n")
+            for line in range(len(self.ignition_coords)):
+                start_loc, end_loc = self.ignition_coords[line]
+                duration = _ignition_duration(start_loc, end_loc, self.ignition_pace)
+                file.write(
+                    "{} {} {} {} {} {}\n".format(
+                        start_loc[0], start_loc[1], end_loc[0], end_loc[1], 0, duration
+                    )
+                )
+        print("ignite.dat written to {}".format(self.qf_path))
+
+    def _copy_duet(self):
+        files = ["duet_v2.0.1a_FF.exe", "FIA_FastFuels_fin_fulllist_populated.txt"]
+        for file in files:
+            src = self.OG_PATH / "Duet" / file
+            dst = self.site_path / file
+            if not src.exists():
+                raise FileNotFoundError(
+                    "run_duet: {} not found in Duet directory".format(file)
+                )
+            copy(src, dst)
+
+    def _find_nsp(self) -> int:
+        species = []
+        with open(self.site_path / "surface_species.dat", "r") as file:
+            for line in file:
+                species.append(line.strip())
+        return len(species) + 1
 
     def _import_fgrid_zarr(self):
         zarr_path = self.site_path / self.mutable_name
