@@ -47,7 +47,14 @@ def main():
         crs="EPSG:5070",
     )
 
-    conditions = [1.0, 0.05, 1.0]
+    margins = [1.0, 0.05, 1.0]
+    moisture = {
+        "Caldor": [0.07, 0.18, 0.07],
+        "Dixie": [0.07, 0.18, 0.07],
+        "KNP": [0.07, 0.17, 0.07],
+        "CedarCreek": [0.09, 0.18, 0.09],
+        "CubCreek2": [0.08, 0.18, 0.08],
+    }
 
     for i in range(len(fire_gdf.index)):
         if i == 24:
@@ -63,16 +70,18 @@ def main():
                 site_name,
                 site_coords,
                 og_path,
-                conditions,
+                margins,
+                moisture,
                 fastfuels_done=True,
                 duet_done=True,
-                query_done=True,
+                calibration_done=True,
             )
             qf_run.run_fastfuels()
             qf_run.get_ignition_doubleline()
             qf_run.draw_ignition()
             qf_run.run_duet()
-            qf_run.calibrate_duet()
+            qf_run.calibrate_duet_from_landfire()
+            qf_run.calibrate_moisture()
             # qf_run.modify_fuels()
             qf_run.quicfire_simulation()
 
@@ -85,24 +94,27 @@ class QuicfireRun:
         site_name,
         site_coords,
         og_path,
-        conditions,
+        margins,
+        moisture,
         EPSG=5070,
         buffer=50,
         fastfuels_done=False,
         duet_done=False,
         severity_done=False,
-        query_done=False,
+        calibration_done=False,
     ):
         OG_PATH = og_path
-        self.OG_PATH = OG_PATH
-        self.fire_name = fire_name
-        self.site_name = site_name
-        self.site_coords = site_coords
-        self.EPSG = EPSG
-        self.buffer = buffer
-        self.conditions = conditions
-        self.ignition_pace = 5
-        self.ignition_length = 200
+        self.OG_PATH: Path = OG_PATH
+        self.fire_name: str = fire_name
+        self.site_name: str = site_name
+        self.site_coords: Polygon = site_coords
+        self.EPSG: int = EPSG
+        self.buffer: int = buffer
+        self.margins: list = margins
+        self.moisture: dict = moisture
+        self.ignition_pace: int = 5
+        self.ignition_length: int = 200
+        self.wind_speed: int = 8
         # Paths
         self.fire_path = OG_PATH / fire_name
         qf_name = f"{site_name}"
@@ -116,10 +128,9 @@ class QuicfireRun:
         self.fastfuels_done = fastfuels_done
         self.duet_done = duet_done
         self.severity_done = severity_done
-        self.query_done = query_done
+        self.calibration_done = calibration_done
         # Calculated
         self.wind_dir = None
-        self.wind_speed = 8
         self.ignition_coords = None
         self.fgrid_zarr = self._import_fgrid_zarr() if fastfuels_done else None
         self.nx = self.fgrid_zarr.attrs["nx"] if fastfuels_done else None
@@ -204,45 +215,6 @@ class QuicfireRun:
             print(
                 "FastFuels has already been run. To rerun, set self.fastfuels_done to False"
             )
-
-    def modify_fuels(self):
-        margins = _get_margin_indices((self.ny, self.nx), 25)
-        rhof = _read_dat_file(
-            self.qf_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
-        )
-        height = _read_dat_file(
-            self.qf_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
-        )
-        moist = _read_dat_file(
-            self.qf_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
-        )
-
-        # Modify fuels in margins
-        margin_rhof = np.zeros((rhof.shape[1], rhof.shape[2]))
-        margin_rhof[margins] = self.conditions[0]
-        rhof[0, :, :] = np.maximum(rhof[0, :, :], margin_rhof)
-        margin_moist = np.ones((rhof.shape[1], rhof.shape[2]))
-        margin_moist[margins] = self.conditions[1]
-        moist[0, :, :] = np.minimum(moist[0, :, :], margin_moist)
-        margin_height = np.zeros((rhof.shape[1], rhof.shape[2]))
-        margin_height[margins] = self.conditions[2]
-        height[0, :, :] = np.maximum(height[0, :, :], margin_height)
-
-        for z in range(1, moist.shape[0]):
-            moist[z, :, :][margins] = 0.1  # canopy fuels 10% moisture in margins
-            # plot_array(moist[z, :, :], f"canopy moisture layer {z}")
-
-        # Modify canopy rhof
-        # rhof[1:10, :, :] = rhof[1:10, :, :] * 5
-        # rhof[1:, :, :][rhof[1:, :, :] > 2.0] = 2.0
-
-        # plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
-        # plot_array(moist[0, :, :], f"modified moisture {self.margins}")
-        # plot_array(height[0, :, :], f"modified height {self.margins}")
-
-        _write_array_to_dat(rhof, "treesrhof.dat", self.qf_path, reshape=False)
-        _write_array_to_dat(moist, "treesmoist.dat", self.qf_path, reshape=False)
-        _write_array_to_dat(height, "treesfueldepth.dat", self.qf_path, reshape=False)
 
     def run_duet(self):
         if self.duet_done == False:
@@ -526,21 +498,21 @@ class QuicfireRun:
                 species.append(line.strip())
         return len(species) + 1
 
-    def calibrate_duet(self):
-        xmin, xmax, ymin, ymax = (
-            self.fgrid_zarr.attrs["xmin"],
-            self.fgrid_zarr.attrs["xmax"],
-            self.fgrid_zarr.attrs["ymin"],
-            self.fgrid_zarr.attrs["ymax"],
-        )
-        pad = 30 / 2
-        xmin, xmax, ymin, ymax = xmin - pad, xmax + pad, ymin - pad, ymax + pad
-        bbox = Polygon(
-            [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)]
-        )
+    def calibrate_duet_from_landfire(self):
+        if self.calibration_done:
+            xmin, xmax, ymin, ymax = (
+                self.fgrid_zarr.attrs["xmin"],
+                self.fgrid_zarr.attrs["xmax"],
+                self.fgrid_zarr.attrs["ymin"],
+                self.fgrid_zarr.attrs["ymax"],
+            )
+            pad = 30 / 2
+            xmin, xmax, ymin, ymax = xmin - pad, xmax + pad, ymin - pad, ymax + pad
+            bbox = Polygon(
+                [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)]
+            )
 
-        duet_run = duet.import_duet(self.site_path, self.nx, self.ny, self.nsp)
-        if self.query_done == False:
+            duet_run = duet.import_duet(self.site_path, self.nx, self.ny, self.nsp)
             query = duet.query_landfire(
                 area_of_interest=bbox, directory=self.site_path, input_epsg=5070
             )
@@ -580,36 +552,101 @@ class QuicfireRun:
                 calibrated_litter = calibrated_grass
                 pass
 
-        duet_density = calibrated_litter.to_numpy("integrated", "density")
-        duet_height = calibrated_litter.to_numpy("integrated", "height")
-        duet_moisture = calibrated_litter.to_numpy("integrated", "moisture")
+            duet_density = calibrated_litter.to_numpy("integrated", "density")
+            duet_height = calibrated_litter.to_numpy("integrated", "height")
+            duet_moisture = calibrated_litter.to_numpy("integrated", "moisture")
 
-        treesrhof = _read_dat_file(
-            self.site_path, "treesrhof.dat", arr_dim=(self.nz, self.ny, self.nx)
-        )
-        treesfueldepth = _read_dat_file(
-            self.site_path, "treesfueldepth.dat", arr_dim=(self.nz, self.ny, self.nx)
-        )
-        treesmoist = _read_dat_file(
-            self.site_path, "treesmoist.dat", arr_dim=(self.nz, self.ny, self.nx)
-        )
-        # plot_array(treesrhof[0, :, :], "treesrhof fastfuels")
-        # plot_array(treesmoist[0, :, :], "treesmoist fastfuels")
-        # plot_array(treesfueldepth[0, :, :], "treesfueldepth fastfuels")
-        # plot_array(duet_density, "calibrated density")
-        # plot_array(duet_moisture, "calibrated moisture")
-        # plot_array(duet_height, "calibrated height")
-        treesrhof[0, :, :] = duet_density
-        treesfueldepth[0, :, :] = duet_height
-        treesmoist[0, :, :] = duet_moisture
-        # plot_array(treesrhof[0, :, :], "treeshrhof calibrated")
+            treesrhof = _read_dat_file(
+                self.site_path, "treesrhof.dat", arr_dim=(self.nz, self.ny, self.nx)
+            )
+            treesfueldepth = _read_dat_file(
+                self.site_path,
+                "treesfueldepth.dat",
+                arr_dim=(self.nz, self.ny, self.nx),
+            )
+            treesmoist = _read_dat_file(
+                self.site_path, "treesmoist.dat", arr_dim=(self.nz, self.ny, self.nx)
+            )
+            # plot_array(treesrhof[0, :, :], "treesrhof fastfuels")
+            # plot_array(treesmoist[0, :, :], "treesmoist fastfuels")
+            # plot_array(treesfueldepth[0, :, :], "treesfueldepth fastfuels")
+            # plot_array(duet_density, "calibrated density")
+            # plot_array(duet_moisture, "calibrated moisture")
+            # plot_array(duet_height, "calibrated height")
+            treesrhof[0, :, :] = duet_density
+            treesfueldepth[0, :, :] = duet_height
+            treesmoist[0, :, :] = duet_moisture
+            # plot_array(treesrhof[0, :, :], "treeshrhof calibrated")
 
-        _write_array_to_dat(treesrhof, "treesrhof.dat", self.qf_path, reshape=False)
-        _write_array_to_dat(
-            treesfueldepth, "treesfueldepth.dat", self.qf_path, reshape=False
+            _write_array_to_dat(treesrhof, "treesrhof.dat", self.qf_path, reshape=False)
+            _write_array_to_dat(
+                treesfueldepth, "treesfueldepth.dat", self.qf_path, reshape=False
+            )
+            _write_array_to_dat(
+                treesmoist, "treesmoist.dat", self.qf_path, reshape=False
+            )
+            self.duet_done = True
+        else:
+            print(
+                "Calibration with Landfire has already been done."
+                "To re-calibrate, set self.calibration_done to False"
+            )
+
+    def calibrate_moisture(self):
+        moisture = self.moisture.get(self.fire_name)
+        duet_run = duet.import_duet(self.site_path, self.nx, self.ny, self.nsp)
+        grass_targets = duet.assign_targets(method="constant", value=moisture[0])
+        litter_targets = duet.assign_targets(
+            method="maxmin", max=moisture[1], min=moisture[2]
         )
-        _write_array_to_dat(treesmoist, "treesmoist.dat", self.qf_path, reshape=False)
-        self.duet_done = True
+        moisture_targets = duet.set_moisture(grass=grass_targets, litter=litter_targets)
+        calibrated = duet.calibrate(duet_run, moisture_targets)
+        calibrated_moisture = calibrated.to_numpy("integrated", "moisture")
+
+        ff_moist = _read_dat_file(
+            self.site_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
+        )
+        ff_moist[0, :, :] = calibrated_moisture
+        _write_array_to_dat(ff_moist, "treesmoist.dat", self.qf_path, reshape=False)
+
+def modify_fuels(self):
+        margins = _get_margin_indices((self.ny, self.nx), 25)
+        rhof = _read_dat_file(
+            self.qf_path, "treesrhof.dat", (self.nz, self.ny, self.nx)
+        )
+        height = _read_dat_file(
+            self.qf_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
+        )
+        moist = _read_dat_file(
+            self.qf_path, "treesmoist.dat", (self.nz, self.ny, self.nx)
+        )
+
+        # Modify fuels in margins
+        margin_rhof = np.zeros((rhof.shape[1], rhof.shape[2]))
+        margin_rhof[margins] = self.margins[0]
+        rhof[0, :, :] = np.maximum(rhof[0, :, :], margin_rhof)
+        margin_moist = np.ones((rhof.shape[1], rhof.shape[2]))
+        margin_moist[margins] = self.margins[1]
+        moist[0, :, :] = np.minimum(moist[0, :, :], margin_moist)
+        margin_height = np.zeros((rhof.shape[1], rhof.shape[2]))
+        margin_height[margins] = self.margins[2]
+        height[0, :, :] = np.maximum(height[0, :, :], margin_height)
+
+        for z in range(1, moist.shape[0]):
+            moist[z, :, :][margins] = 0.1  # canopy fuels 10% moisture in margins
+            # plot_array(moist[z, :, :], f"canopy moisture layer {z}")
+
+        # Modify canopy rhof
+        # rhof[1:10, :, :] = rhof[1:10, :, :] * 5
+        # rhof[1:, :, :][rhof[1:, :, :] > 2.0] = 2.0
+
+        # plot_array(rhof[0, :, :], f"modified rhof {self.margins}")
+        # plot_array(moist[0, :, :], f"modified moisture {self.margins}")
+        # plot_array(height[0, :, :], f"modified height {self.margins}")
+
+        _write_array_to_dat(rhof, "treesrhof.dat", self.qf_path, reshape=False)
+        _write_array_to_dat(moist, "treesmoist.dat", self.qf_path, reshape=False)
+        _write_array_to_dat(height, "treesfueldepth.dat", self.qf_path, reshape=False)
 
     def _import_fgrid_zarr(self):
         zarr_path = self.site_path / self.mutable_name
