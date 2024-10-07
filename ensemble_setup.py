@@ -119,19 +119,19 @@ class QuicfireRun:
         self.ignition_length: int = 200
         self.wind_speed: int = 8
         # Paths
-        self.fire_path = OG_PATH / fire_name
+        self.fire_path: Path = OG_PATH / fire_name
         qf_name = f"{site_name}"
-        self.qf_path = OG_PATH / "QF_runs" / fire_name / qf_name
-        self.site_path = OG_PATH / fire_name / "Sample_Basins" / site_name
+        self.qf_path: Path = OG_PATH / "QF_runs" / fire_name / qf_name
+        self.site_path: Path = OG_PATH / fire_name / "Sample_Basins" / site_name
         # Filenames
         self.shp_name = self.site_name + ".shp"
         self.fgrid_name = self.site_name + "_fuelgrid.zip"
         self.mutable_name = self.site_name + "_fastfuels.zarr"
         # Done
-        self.fastfuels_done = fastfuels_done
-        self.duet_done = duet_done
-        self.severity_done = severity_done
-        self.calibration_done = calibration_done
+        self.fastfuels_done: bool = fastfuels_done
+        self.duet_done: bool = duet_done
+        self.severity_done: bool = severity_done
+        self.calibration_done: bool = calibration_done
         # Calculated
         self.wind_dir = None
         self.ignition_coords = None
@@ -141,8 +141,8 @@ class QuicfireRun:
         self.nz = self.fgrid_zarr.attrs["nz"] if fastfuels_done else None
         self.nsp = self._find_nsp() if duet_done else None
         # Test
-        self.check_inputs = check_inputs
-        self.write_test_sim = write_test_sim
+        self.check_inputs: bool = check_inputs
+        self.write_test_sim: bool = write_test_sim
         # Make dirs
         paths = [self.fire_path, self.qf_path, self.site_path]
         for p in paths:
@@ -574,6 +574,7 @@ class QuicfireRun:
             dst = self.qf_path / file
             copy(src, dst)
 
+        self._delete_test_run(sim)
         if self.write_test_sim:
             self._json_to_test_qf_run()
             # exe
@@ -723,6 +724,32 @@ class QuicfireRun:
         sim = qft.SimulationInputs.from_json(self.qf_path / f"{self.site_name}.json")
         sim.set_output_files(fuel_dens=True)
         sim.write_inputs(self.qf_path)
+
+    def _delete_test_run(self, sim: qft.SimulationInputs):
+        to_delete = []
+
+        # executable
+        to_delete.append("quicfire_MACI.exe")
+        # drawfire
+        drawfire_dir = Path(
+            "/Users/ntutland/Documents/Quicfire/QF_6.0.0/scripts/postprocessing/python3/quicfire_vis"
+        )
+        for file in drawfire_dir.iterdir():
+            to_delete.append(file.name)
+        # inp files
+        for inp_name, inp_file in sim._input_files_dict.items():
+            if inp_name != "windsensors":
+                to_delete.append(f"{inp_file.name}{inp_file._extension}")
+            else:
+                for sensor in inp_file.sensor_array:
+                    to_delete.append(f"{sensor.name}{sensor._extension}")
+        to_delete.append("QU_landuse.inp")
+
+        # delete!
+        for file in to_delete:
+            unlink_it = Path(self.qf_path / file)
+            if unlink_it.exists():
+                unlink_it.unlink()
 
 
 def _read_dat_file(

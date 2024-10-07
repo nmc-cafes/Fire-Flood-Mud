@@ -24,7 +24,7 @@ def plot_array(x: np.ndarray, title: str):
 
 
 HERE = Path(__file__).parent
-runpath = HERE / "QF_runs" / "Moisture_Sensitivity" / "Cal5"
+runpath = HERE / "QF_runs" / "Caldor" / "Cal5"
 sim = SimulationOutputs(runpath / "Output", nz=84, nx=333, ny=295)
 
 # runpath = HERE / "QF_runs" / "Moisture_Sensitivity" / "Dix5"
