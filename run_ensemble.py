@@ -14,14 +14,15 @@ import os
 
 def main():
     # Specify the directory containing the executables
-    ensemble_dir = Path(__file__).parent / "QF_runs" / "Expanded_Sampling"
+    ensemble_dir = Path(__file__).parent / "QF_runs" / "Severe_Steep"
 
     # Get a list of all executable files in the directory
-    fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+    # fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+    fires = ["Caldor"]
     executables = []
     for fire in fires:
-        for site in range(1, 19):
-            exe = os.path.join(ensemble_dir, fire, f"{fire}_{fire}{site}_duet")
+        for site in range(1, 21):
+            exe = os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}")
             executables.append(exe)
 
     # Number of concurrent processes
