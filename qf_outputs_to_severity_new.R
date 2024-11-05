@@ -14,16 +14,13 @@ output_to_rst <- function(output, out_arr, plot_bounds){
   return(out_rst)
 }
 
-process_output <- function(fire, site, output, domain, slope){
+process_output <- function(fire, site, output, domain, basin){
   out_arr <- read.table(here("QF_results",
                              fire, 
                              site,
                              "Arrays",
                              paste0(output,".txt")))
   out_rst <- output_to_rst(output, out_arr, domain)
-  dom_slope <- crop(slope, ext(out_rst))
-  dom_slope <- project(dom_slope, out_rst)
-  out_rst[dom_slope<23] <- NA
   out_rst <- mask(out_rst, basin)
   return(out_rst)
 }
@@ -33,6 +30,17 @@ process_severity <- function(severity, out_rst){
   dom_sev <- project(dom_sev, out_rst, method="near")
   dom_sev[is.na(out_rst)] <- NA
   return(dom_sev)
+}
+
+create_slope_mask <- function(slope, out_rst){
+  dom_slope <- crop(slope, ext(out_rst))
+  dom_slope <- project(dom_slope, out_rst)
+  slope_mask <- out_rst
+  slope_mask[dom_slope>23] <- 1
+  slope_mask[dom_slope<=23] <- 0
+  slope_mask[is.na(out_rst)] <- NA
+  names(slope_mask) <- "steep"
+  return(slope_mask)
 }
 
 fires <- c("Caldor","CedarCreek","Dixie","KNP")
@@ -64,12 +72,15 @@ for(j in 1:length(fires)){
     basin <- basins[i]
     for(output in outputs){
       cat("\t\t",output,"\n")
-      out_rst <- process_output(fires[j],site,output,domain,slope)
+      out_rst <- process_output(fires[j],site,output,domain,basin)
       if(output == outputs[1]){
         dom_sev <- process_severity(severity,  out_rst)
         sev_dat <- values(dom_sev, mat=F)
         sev_dat <- sev_dat[!is.na(sev_dat)]
-        site_df <- tibble(severity = sev_dat)
+        slope_mask <- create_slope_mask(slope, out_rst)
+        slope_dat <- values(slope_mask, mat=F)
+        slope_dat <- slope_dat[!is.na(slope_dat)]
+        site_df <- tibble("severity" = sev_dat, "steep" = slope_dat)
       }
       out_dat <- values(out_rst, mat=F)
       out_dat <- out_dat[!is.na(out_dat)]
@@ -87,3 +98,4 @@ for(j in 1:length(fires)){
 alldata_df <- bind_rows(alldata_list)
 
 write.csv(alldata_df, here("QF_results","qf_results.csv"), row.names=F)
+

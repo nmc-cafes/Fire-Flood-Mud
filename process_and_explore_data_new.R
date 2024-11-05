@@ -9,7 +9,7 @@ skim_without_charts(dat_raw)
 
 dat_site <- dat_raw %>%
   group_by(site, fire) %>%
-  summarize(severity_pct = sum(severity %in% c(3,4)) / sum(severity > 0),
+  summarize(severity_pct = sum(severity %in% c(3,4) & steep==1) / sum(severity > 0),
             canopy_consumption_pct_mean = mean(canopy_consumption_pct)*100,
             canopy_consumption_tot_sum = sum(canopy_consumption_tot),
             canopy_residence_time_mean = mean(canopy_residence_time),
@@ -83,7 +83,7 @@ scatter <- dat_long %>%
   facet_wrap(.~var, scales="free_x") +
   scale_color_colorblind() +
   labs(x="",
-       y="Percent Burned at\nModerate to High Severity",
+       y="Percent Burned at\nModerate to High Severity on Steep Slopes",
        color = "Focal Fire") +
   theme_bw()
 scatter
