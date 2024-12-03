@@ -9,9 +9,23 @@ library(doParallel)
 library(themis)
 
 ### First with multiple classes
+dat_raw <- read_csv(here("QF_results","qf_results.csv"))
 
-dat <- read.csv(here("all_data_expandedsampling_site.csv")) %>%
-  mutate(high_sev_cls = cut_interval(high_sev_pct, 4))
+dat <- dat_raw %>%
+  group_by(site, fire) %>%
+  summarize(severity_pct = sum(severity %in% c(3,4)) / sum(severity > 0),
+            canopy_consumption_pct_mean = mean(canopy_consumption_pct)*100,
+            canopy_consumption_tot_sum = sum(canopy_consumption_tot),
+            canopy_residence_time_mean = mean(canopy_residence_time),
+            energy_flux_mean = mean(energy_flux),
+            mass_burnt_pct_mean = mean(mass_burnt_pct),
+            max_power_mean = mean(max_power),
+            surface_consumption_pct_mean = mean(surface_consumption_pct)*100,
+            surface_consumption_tot_sum = sum(surface_consumption_tot),
+            surface_residence_time_mean = mean(surface_residence_time),
+            total_power_sum = sum(total_power)) %>%
+  ungroup() %>%
+  mutate(high_sev_cls = cut_interval(severity_pct, 4))
 
 set.seed(47)
 dat_split <- initial_split(dat, strata = high_sev_cls)
@@ -20,7 +34,16 @@ dat_test <- testing(dat_split)
 
 cls_metrics <- metric_set(roc_auc, accuracy, sensitivity, specificity)
 
-cls_formula <- formula(high_sev_cls ~ surface_consumption_pct + surface_consumption + canopy_consumption + max_power + residence_time_power)
+cls_formula <- formula(high_sev_cls ~ 
+                         mass_burnt_pct_mean +
+                         surface_consumption_pct_mean + 
+                         surface_consumption_tot_sum + 
+                         canopy_consumption_pct_mean + 
+                         canopy_consumption_tot_sum +
+                         max_power_mean + 
+                         energy_flux_mean +
+                         surface_residence_time_mean +
+                         canopy_residence_time_mean)
 
 dat_rec <- recipe(cls_formula, data = dat_train) %>%
   step_dummy(all_nominal(), -all_outcomes()) %>%
@@ -64,8 +87,8 @@ tune_res %>%
   labs(x = NULL, y = "ROC_AUC")
 
 rf_grid <- grid_regular(
-  mtry(range = c(3,9)),
-  min_n(range = c(30,70)),
+  mtry(range = c(1,8)),
+  min_n(range = c(20,40)),
   levels = 8
 )
 
@@ -124,7 +147,8 @@ predictions <- predict(train_fit, new_data = dat_test, type = "class")
 ###############
 ## Then with only two
 
-dat <- read.csv(here("all_data_expandedsampling_site.csv")) %>%
+dat <- dat %>%
+  mutate(high_sev_bin = if_else(severity_pct>0.50,1,0)) %>%
   mutate(high_sev_bin = factor(high_sev_bin))
 
 set.seed(47)
@@ -134,7 +158,16 @@ dat_test <- testing(dat_split)
 
 cls_metrics <- metric_set(roc_auc, accuracy, sensitivity, specificity)
 
-cls_formula <- formula(high_sev_bin ~ surface_consumption_pct + surface_consumption + canopy_consumption + max_power + residence_time_power)
+cls_formula <- formula(high_sev_bin ~ 
+                         mass_burnt_pct_mean +
+                         surface_consumption_pct_mean + 
+                         surface_consumption_tot_sum + 
+                         canopy_consumption_pct_mean + 
+                         canopy_consumption_tot_sum +
+                         max_power_mean + 
+                         energy_flux_mean +
+                         surface_residence_time_mean +
+                         canopy_residence_time_mean)
 
 dat_rec <- recipe(cls_formula, data = dat_train) %>%
   step_dummy(all_nominal(), -all_outcomes()) %>%
@@ -178,8 +211,8 @@ tune_res %>%
   labs(x = NULL, y = "ROC_AUC")
 
 rf_grid <- grid_regular(
-  mtry(range = c(1, 5)),
-  min_n(range = c(15, 35)),
+  mtry(range = c(1, 9)),
+  min_n(range = c(20, 40)),
   levels = 5
 )
 
