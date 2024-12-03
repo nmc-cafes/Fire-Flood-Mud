@@ -6,9 +6,6 @@ Adapted from code provided by Zach Cope 2/15/24
 from pathlib import Path
 import subprocess
 from multiprocessing import Pool
-import time
-import shutil
-import json
 import os
 
 
@@ -18,10 +15,10 @@ def main():
 
     # Get a list of all executable files in the directory
     # fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
-    fires = ["Caldor"]
+    fires = ["KNP"]
     executables = []
     for fire in fires:
-        for site in range(1, 21):
+        for site in [4, 8, 9, 10, 11, 12, 19, 20]:
             exe = os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}")
             executables.append(exe)
 
