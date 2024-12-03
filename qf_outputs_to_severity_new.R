@@ -32,6 +32,14 @@ process_severity <- function(severity, out_rst){
   return(dom_sev)
 }
 
+process_tree_mortality <- function(tree_mortality, out_rst){
+  dom_tm <- crop(tree_mortality,ext(out_rst))
+  dom_tm[is.na(dom_tm)] <- 0
+  dom_tm <- project(dom_tm, out_rst, method="near")
+  dom_tm[is.na(out_rst)] <- NA
+  return(dom_tm)
+}
+
 create_slope_mask <- function(slope, out_rst){
   dom_slope <- crop(slope, ext(out_rst))
   dom_slope <- project(dom_slope, out_rst)
@@ -43,7 +51,8 @@ create_slope_mask <- function(slope, out_rst){
   return(slope_mask)
 }
 
-fires <- c("Caldor","CedarCreek","Dixie","KNP")
+# fires <- c("Caldor","CedarCreek","Dixie","KNP")
+fires <- c("KNP")
 outputs <- c("canopy_consumption_pct",
              "canopy_consumption_tot",
              "canopy_remaining_pct",
@@ -63,6 +72,8 @@ for(j in 1:length(fires)){
   fire_list <- list()
   dem <- rast(here(fires[j], paste0(fires[j],"_DEM.tif")))
   severity <- rast(here(fires[j],paste0(fires[j],"_Severity.tif")))
+  tree_mortality <- rast(here("KNP","Tree_Survivorship","burn_severity_model_predictions.tif"))
+  tree_mortality <- project(tree_mortality, "EPSG:5070")
   slope <- terrain(dem, v="slope", unit="degree")
   basins <- vect(here(fires[j],paste0(fires[j],"_sample_basins.shp")))
   for(i in 1:20){
@@ -80,7 +91,18 @@ for(j in 1:length(fires)){
         slope_mask <- create_slope_mask(slope, out_rst)
         slope_dat <- values(slope_mask, mat=F)
         slope_dat <- slope_dat[!is.na(slope_dat)]
-        site_df <- tibble("severity" = sev_dat, "steep" = slope_dat)
+        dom_tm <- process_tree_mortality(tree_mortality, out_rst)
+        tm_small <- values(dom_tm$predictions_small, mat=F)
+        tm_medium <- values(dom_tm$predictions_medium, mat=F)
+        tm_large <- values(dom_tm$predictions_large, mat=F)
+        tm_small <- tm_small[!is.na(tm_small)]
+        tm_medium <- tm_medium[!is.na(tm_medium)]
+        tm_large <- tm_large[!is.na(tm_large)]
+        site_df <- tibble("severity" = sev_dat, 
+                          "steep" = slope_dat,
+                          "mortality_small" = tm_small,
+                          "mortality_medium" = tm_medium,
+                          "mortality_large" = tm_large)
       }
       out_dat <- values(out_rst, mat=F)
       out_dat <- out_dat[!is.na(out_dat)]
@@ -97,5 +119,6 @@ for(j in 1:length(fires)){
 
 alldata_df <- bind_rows(alldata_list)
 
-write.csv(alldata_df, here("QF_results","qf_results.csv"), row.names=F)
+# write.csv(alldata_df, here("QF_results","qf_results.csv"), row.names=F)
+write.csv(alldata_df, here("QF_results","KNP_results.csv"), row.names=F)
 
