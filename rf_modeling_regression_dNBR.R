@@ -10,14 +10,25 @@ library(doParallel)
 dat <- read.csv(here("QF_results","qf_results_site.csv"))
 # dat <- dat %>% filter(severity_class != "low")
 
+dat <- dat %>%
+  mutate(severity_class = if_else(severity_pct > 30, 1, 0))
+
 set.seed(47)
 dat_split <- initial_split(dat, strata = severity_class)
 dat_train <- training(dat_split)
 dat_test <- testing(dat_split)
 
-scaled_formula <- formula(high_sev_pct ~ surface_consumption_pct + surface_consumption + canopy_consumption + max_power + residence_time_power)
+dnbr_formula <- formula(dNBR_mean ~ 
+                surface_consumption_pct_mean + 
+                surface_consumption_tot_sum + 
+                canopy_consumption_pct_mean +
+                canopy_consumption_tot_sum + 
+                surface_residence_time_mean +
+                canopy_residence_time_mean +
+                max_power_mean +
+                energy_flux_mean)
 
-dat_rec <- recipe(scaled_formula, data = dat_train) %>%
+dat_rec <- recipe(dnbr_formula, data = dat_train) %>%
   step_dummy(all_nominal(), -all_outcomes())
 
 tune_spec <- rand_forest(
@@ -58,8 +69,8 @@ tune_res %>%
   labs(x = NULL, y = "RMSE")
 
 rf_grid <- grid_regular(
-  mtry(range = c(1, 5)),
-  min_n(range = c(1, 20)),
+  mtry(range = c(1, 4)),
+  min_n(range = c(20, 40)),
   levels = 5
 )
 
@@ -91,7 +102,7 @@ library(vip)
 dat_prep <- prep(dat_rec)
 final_rf %>%
   set_engine("ranger", importance = "permutation") %>%
-  fit(high_sev_pct ~ .,
+  fit(dnbr_formula,
       data = juice(dat_prep)
   ) %>%
   vip(geom = "point")
@@ -109,12 +120,12 @@ final_res %>%
 final_res %>%
   collect_predictions() %>%
   ggplot() +
-  geom_point(aes(high_sev_pct,.pred), shape=1, alpha=0.5) +
+  geom_point(aes(dNBR_mean,.pred), shape=1, alpha=0.5) +
   geom_abline(intercept = 0, slope=1, linetype="dashed", color="red") +
-  scale_x_continuous(limits = c(0,100)) +
-  scale_y_continuous(limits = c(0,100)) +
-  labs(x="Observed Percent Burneed at High Severity",
-       y="Predicted Percent\nBurned at High Severity") +
+  scale_x_continuous(limits = c(200,800)) +
+  scale_y_continuous(limits = c(200,800)) +
+  labs(x="Observed dNBR",
+       y="Predicted dNBR") +
   theme_bw() +
   theme(aspect.ratio = 1)
   
