@@ -7,7 +7,7 @@ library(tidyverse)
 library(tidymodels)
 library(doParallel)
 
-dat <- read.csv(here("all_data_expandedsampling_site.csv"))
+dat <- read.csv(here("QF_results","qf_results_site.csv"))
 # dat <- dat %>% filter(severity_class != "low")
 
 set.seed(47)
