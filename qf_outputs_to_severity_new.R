@@ -131,6 +131,6 @@ for(j in 1:length(fires)){
 
 alldata_df <- bind_rows(alldata_list)
 
-# write.csv(alldata_df, here("QF_results","qf_results.csv"), row.names=F)
-write.csv(alldata_df, here("QF_results","KNP_results.csv"), row.names=F)
+write.csv(alldata_df, here("QF_results","qf_results.csv"), row.names=F)
+# write.csv(alldata_df, here("QF_results","KNP_results.csv"), row.names=F)
 

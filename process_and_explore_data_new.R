@@ -16,6 +16,7 @@ dat_ifd <- dat_raw %>%
 dat_site <- dat_ifd %>%
   group_by(site, fire) %>%
   summarize(severity_pct = sum(severity %in% c(3,4) & steep==1) / sum(severity > 0),
+            dNBR_mean = mean(dNBR),
             canopy_consumption_pct_mean = mean(canopy_consumption_pct)*100,
             canopy_consumption_tot_sum = sum(canopy_consumption_tot),
             canopy_residence_time_mean = mean(canopy_residence_time),
@@ -33,10 +34,12 @@ dat_site <- dat_ifd %>%
          canopy_consumption_tot_sum = canopy_consumption_tot_sum/1000, #kilograms to megagrams
          surface_consumption_tot_sum = surface_consumption_tot_sum/1000)
 
-ggpairs(dat_site[,4:13])
+write.csv(dat_site, here("QF_results","qf_results_site.csv"), row.names = F)
+
+ggpairs(dat_site[,5:14])
 
 dat_long <- dat_site %>%
-  pivot_longer(cols = 4:13,
+  pivot_longer(cols = 5:14,
                values_to = "val",
                names_to = "var") %>%
   mutate(var = factor(var, 
@@ -88,7 +91,7 @@ canopy_cons_site
 
 
 ## Scatterplots
-scatter <- dat_long %>%
+ss_scatter <- dat_long %>%
   filter(var != "Total Power (kW)") %>%
   ggplot() +
   geom_point(aes(val,severity_pct,color=fire)) +
@@ -102,8 +105,24 @@ scatter <- dat_long %>%
   theme_bw() +
   theme(legend.position = "inside",
         legend.position.inside = c(0.9, 0.2))
-scatter
-ggsave("severe_steep_scatters.png",scatter,path=here("Plots"),width=10, height=4)
+ss_scatter
+ggsave("severe_steep_scatters.png",ss_scatter,path=here("Plots"),width=10, height=4)
+
+dnbr_scatter <- dat_long %>%
+  filter(var != "Total Power (kW)") %>%
+  ggplot() +
+  geom_point(aes(val,dNBR_mean,color=fire)) +
+  geom_smooth(aes(val,dNBR_mean), method="lm", color = "black") +
+  facet_wrap(.~var, scales="free_x", nrow = 2) +
+  scale_color_colorblind() +
+  labs(x="",
+       y="Average dNBR",
+       color = "Focal Fire") +
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.9, 0.2))
+dnbr_scatter
+ggsave("dNBR_scatters.png",dnbr_scatter,path=here("Plots"),width=10, height=4)
 
 ## severity class boxplots
 mtbs_colors <-c("#006400","#7fffd4","#ffff00","#ff0000","#7fff00")
