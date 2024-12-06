@@ -3,11 +3,17 @@ library(tidyverse)
 library(skimr)
 library(ggthemes)
 library(GGally)
+library(scales)
 
 dat_raw <- read_csv(here("QF_results","qf_results.csv"))
 skim_without_charts(dat_raw)
 
-dat_site <- dat_raw %>%
+dat_ifd <- dat_raw %>%
+  mutate(canopy_rhof_init = canopy_consumption_tot/canopy_consumption_pct,
+         surface_rhof_init = surface_consumption_tot/surface_consumption_pct) %>%
+  mutate(total_rhof_init = canopy_rhof_init + surface_rhof_init)
+
+dat_site <- dat_ifd %>%
   group_by(site, fire) %>%
   summarize(severity_pct = sum(severity %in% c(3,4) & steep==1) / sum(severity > 0),
             canopy_consumption_pct_mean = mean(canopy_consumption_pct)*100,
@@ -19,7 +25,13 @@ dat_site <- dat_raw %>%
             surface_consumption_pct_mean = mean(surface_consumption_pct)*100,
             surface_consumption_tot_sum = sum(surface_consumption_tot),
             surface_residence_time_mean = mean(surface_residence_time),
-            total_power_sum = sum(total_power))
+            total_power_sum = sum(total_power),
+            canopy_rhof_init_sum = sum(canopy_rhof_init, na.rm=T),
+            surface_rhof_init_sum = sum(surface_rhof_init, na.rm=T),
+            total_rhof_init_sum = sum(total_rhof_init, na.rm=T)) %>%
+  mutate(canopy_residence_time_mean = canopy_residence_time_mean/60, #canopy res time to min
+         canopy_consumption_tot_sum = canopy_consumption_tot_sum/1000, #kilograms to megagrams
+         surface_consumption_tot_sum = surface_consumption_tot_sum/1000)
 
 ggpairs(dat_site[,4:13])
 
@@ -28,26 +40,26 @@ dat_long <- dat_site %>%
                values_to = "val",
                names_to = "var") %>%
   mutate(var = factor(var, 
-                      levels = c("mass_burnt_pct_mean",
-                                 "surface_consumption_tot_sum",
+                      levels = c("surface_consumption_tot_sum",
                                  "surface_consumption_pct_mean",
                                  "canopy_consumption_tot_sum",
                                  "canopy_consumption_pct_mean",
+                                 "mass_burnt_pct_mean",
                                  "surface_residence_time_mean",
                                  "canopy_residence_time_mean",
                                  "max_power_mean",
                                  "total_power_sum",
                                  "energy_flux_mean"),
-                      labels = c("Percent Mass Burnt",
-                                 "Total Surface\nConsumption (kg/m3)",
+                      labels = c("Total Surface\nConsumption (Mg/m3)",
                                  "Total Surface\nConsumption (%)",
-                                 "Total Canopy\nConsumption (kg/m3)",
+                                 "Total Canopy\nConsumption (Mg/m3)",
                                  "Total Canopy\nConsumption (%)",
+                                 "Total Consumption (%)",
                                  "Average Surface\nResidence Time (s)",
-                                 "Average Canopy\nResidence Time (s)",
-                                 "Average Max Power (W/m^3)",
-                                 "Total Power (W)",
-                                 "Mean Energy Flux (W/m^3/s)")))
+                                 "Average Canopy\nResidence Time (min)",
+                                 "Average Max\nPower (kW/m3)",
+                                 "Total Power (kW)",
+                                 "Average Power (kW)")))
 
 ## Bar charts
 mburnt_site <- dat_site %>%
@@ -77,16 +89,21 @@ canopy_cons_site
 
 ## Scatterplots
 scatter <- dat_long %>%
+  filter(var != "Total Power (kW)") %>%
   ggplot() +
   geom_point(aes(val,severity_pct,color=fire)) +
   geom_smooth(aes(val,severity_pct), method="lm", color = "black") +
-  facet_wrap(.~var, scales="free_x") +
+  facet_wrap(.~var, scales="free_x", nrow = 2) +
   scale_color_colorblind() +
+  scale_y_continuous(labels = percent_format()) +
   labs(x="",
        y="Percent Burned at\nModerate to High Severity on Steep Slopes",
        color = "Focal Fire") +
-  theme_bw()
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.9, 0.2))
 scatter
+ggsave("severe_steep_scatters.png",scatter,path=here("Plots"),width=10, height=4)
 
 ## severity class boxplots
 mtbs_colors <-c("#006400","#7fffd4","#ffff00","#ff0000","#7fff00")
@@ -154,4 +171,14 @@ canopy_pct_boxplot <- dat_raw %>%
        fill = "Severity") +
   theme_bw()
 canopy_pct_boxplot
+
+
+########
+
+dat_site %>%
+  ggplot() +
+  geom_point(aes(surface_rhof_init_sum, severity_pct, color = fire)) +
+  geom_smooth(aes(surface_rhof_init_sum, severity_pct), method = "lm") +
+  theme_bw()
   
+
