@@ -11,7 +11,7 @@ dat <- read.csv(here("QF_results","qf_results_site.csv"))
 # dat <- dat %>% filter(severity_class != "low")
 
 dat <- dat %>%
-  mutate(severity_class = if_else(severity_pct > 30, 1, 0))
+  mutate(severity_class = if_else(severity_pct > 0.3, 1, 0))
 
 set.seed(47)
 dat_split <- initial_split(dat, strata = severity_class)
@@ -122,8 +122,8 @@ final_res %>%
   ggplot() +
   geom_point(aes(dNBR_mean,.pred), shape=1, alpha=0.5) +
   geom_abline(intercept = 0, slope=1, linetype="dashed", color="red") +
-  scale_x_continuous(limits = c(200,800)) +
-  scale_y_continuous(limits = c(200,800)) +
+  scale_x_continuous(limits = c(0,1000)) +
+  scale_y_continuous(limits = c(0,1000)) +
   labs(x="Observed dNBR",
        y="Predicted dNBR") +
   theme_bw() +
