@@ -28,16 +28,18 @@ severity <- rast(here("KNP","KNP_Severity.tif")) %>%
 
 mtbs_colors <-c("#006400","#7fffd4","#ffff00","#ff0000","#7fff00")
 
+sites <- sites %>% mutate(severe = factor(severe, levels = c(0,1), labels = c("Low Risk","High Risk")))
+
 basin_selection <- ggplot() +
   geom_spatraster(data = severity) +
   geom_spatvector(data = perimeter, fill=NA) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
   geom_spatvector(data = slope_vect, fill="white", color=NA) +
-  geom_spatvector(data = sites, fill=NA, color="black", linewidth=0.5) +
-  theme_bw() +
+  geom_spatvector(data = sites, fill=NA, aes(color=severe), linewidth=0.5) +
+  scale_color_manual(values = c("darkcyan", "blue")) +
+  theme_bw() + 
   theme(legend.title = element_blank(),
         legend.position = "inside",
-        legend.position.inside = c(0.75,0.835),
-        legend.key = element_rect(color="black"))
+        legend.position.inside = c(0.79,0.82))
 basin_selection
-ggsave("basin_selection_fig.png", basin_selection, path = here("Plots"), width = 10, height = 13.5, units = "cm")
+ggsave("basin_selection_fig.png", basin_selection, path = here("Plots"), width = 13, height = 18, units = "cm")
