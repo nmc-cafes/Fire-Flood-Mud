@@ -2,7 +2,7 @@ from pathlib import Path
 from quicfire_tools import SimulationInputs
 from shutil import copy
 
-qf_dir = Path(__file__).parent / "QF_runs" / "Severe_Steep"
+qf_dir = Path("D:/Fire-Flood-Mud/QF_runs/SBS")
 
 fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 qf_path = (
@@ -14,7 +14,7 @@ qf_path = (
 )
 
 for fire in fires:
-    sites = [f"{fire[:3]}{i}" for i in range(1, 19)]
+    sites = [f"{fire[:3]}{i}" for i in range(1, 21)]
     for site in sites:
         print(f"{fire} - {site}")
         run_path = qf_dir / fire / site
