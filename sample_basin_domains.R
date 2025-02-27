@@ -11,7 +11,7 @@ library(here)
 fires <- c("KNP","Caldor","CedarCreek","CubCreek2","Dixie")
 for(fire in fires){
   cat(fire,"\n")
-  polygons <- vect(here(fire,paste0(fire,"_sample_basins.shp")))
+  polygons <- vect(here(fire,paste0(fire,"_sample_basins_sbs.shp")))
   # plot(polygons)
   
   # loop through each polygon
@@ -41,7 +41,7 @@ for(fire in fires){
     filename <- paste0(basin_name,".shp")
 
     # save the buffered polygon as a new shapefile
-    output_path <- here(output_dir,paste0(basin_name,".shp"))
+    output_path <- here(output_dir,filename)
     writeVector(buffered_bbox, output_path, overwrite = TRUE)
   }
 }
@@ -49,9 +49,9 @@ for(fire in fires){
 
 # Check the result
 test_fire <- "Caldor"
-test_num <- 5
+test_num <- 14
 test_name <- paste0(substr(test_fire, start = 1, stop = 3),test_num)
-test_basins <- vect(here(test_fire,paste0(test_fire,"_sample_basins.shp")))
+test_basins <- vect(here(test_fire,paste0(test_fire,"_sample_basins_sbs.shp")))
 test_basin <- test_basins[test_num, ]
 test_bbox <- vect(ext(test_basin), crs=crs(test_basin))
 test_domain <- vect(here(test_fire,"Sample_Basins",test_name,paste0(test_name,".shp")))

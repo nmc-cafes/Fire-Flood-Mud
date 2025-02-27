@@ -39,7 +39,7 @@ import duet_tools as duet
 
 def main():
     HERE = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud")
-    sites_path = HERE / "Sample_Basins.csv"
+    sites_path = HERE / "Sample_Basins_SBS.csv"
     fire_df = pd.read_csv(sites_path)
     fire_gdf = gpd.GeoDataFrame(
         fire_df,
@@ -55,9 +55,16 @@ def main():
         "CedarCreek": [0.09, 0.18, 0.09],
         "CubCreek2": [0.08, 0.18, 0.08],
     }
+    windspeed = {
+        "Caldor": 8.0,
+        "Dixie": 9.84,
+        "KNP": 6.93,
+        "CedarCreek": 10.73,
+        "CubCreek2": 10.28,
+    }
 
     for i in range(len(fire_gdf.index)):
-        if i >= 0:
+        if i >= 99:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             site_coords = fire_gdf.iloc[i]["geometry"]
@@ -72,9 +79,10 @@ def main():
                 og_path,
                 margins,
                 moisture,
-                fastfuels_done=True,
-                duet_done=True,
-                calibration_done=True,
+                windspeed,
+                fastfuels_done=False,
+                duet_done=False,
+                calibration_done=False,
                 check_inputs=False,
                 write_test_sim=False,
             )
@@ -97,6 +105,7 @@ class QuicfireRun:
         og_path,
         margins,
         moisture,
+        wind_speed,
         EPSG=5070,
         buffer=50,
         fastfuels_done=False,
@@ -117,7 +126,7 @@ class QuicfireRun:
         self.moisture: dict = moisture
         self.ignition_pace: int = 5
         self.ignition_length: int = 200
-        self.wind_speed: int = 8
+        self.wind_speed: float = wind_speed.get(fire_name)
         # Paths
         self.fire_path: Path = OG_PATH / fire_name
         qf_name = f"{site_name}"
@@ -352,6 +361,16 @@ class QuicfireRun:
                 test_path = self.site_path / file
                 if not test_path.exists():
                     raise FileNotFoundError("run_duet: {} not found".format(file))
+            # add wind direction to duet.in
+            with open(self.site_path / "duet.in", "r") as f:
+                lines = f.readlines()
+            with open(self.site_path / "duet.in", "w") as f:
+                for line in lines:
+                    (
+                        f.write(f"{self.wind_dir}  ! wind direction (in degrees)\n")
+                        if line.startswith("None")
+                        else f.write(line)
+                    )
             # run DUET
             chdir(self.site_path)
             with subprocess.Popen(
@@ -363,7 +382,7 @@ class QuicfireRun:
 
                 while process.poll() not in [0, -10, -11]:
                     poll_and_read()
-                    print(f"{process.poll()}")
+                    # print(f"{process.poll()}")
                     sleep(1)
                 if process.poll() in [0, -10, -11]:
                     print(f"DUET run successfully (Exit poll: {process.poll()})")

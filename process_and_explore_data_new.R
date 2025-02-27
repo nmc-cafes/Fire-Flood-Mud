@@ -5,6 +5,33 @@ library(ggthemes)
 library(GGally)
 library(scales)
 
+corr_upper <- function(data, mapping, method="p", use="pairwise", ...){
+  
+  # grab data
+  x <- eval_data_col(data, mapping$x)
+  y <- eval_data_col(data, mapping$y)
+  
+  # calculate correlation
+  corr <- cor(x, y, method=method, use=use)
+  
+  # calculate colour based on correlation value
+  # Here I have set a correlation of minus one to blue, 
+  # zero to white, and one to red 
+  # Change this to suit: possibly extend to add as an argument of `my_fn`
+  colFn <- colorRampPalette(c("blue", "white", "red"), interpolate ='spline')
+  fill <- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
+  
+  ggally_cor(data = data, mapping = mapping, color="black", ...) + 
+    theme_void() +
+    theme(panel.background = element_rect(fill=fill))
+}
+
+corr_lower <- function(data, mapping){
+  ggally_points(data = data, mapping = mapping, shape = 1, alpha = 0.5) +
+    scale_y_continuous(n.breaks = 3) +
+    theme_bw()
+}
+
 dat_raw <- read_csv(here("QF_results","qf_results.csv"))
 skim_without_charts(dat_raw)
 
@@ -32,12 +59,39 @@ dat_site <- dat_ifd %>%
             total_rhof_init_sum = sum(total_rhof_init, na.rm=T)) %>%
   mutate(canopy_residence_time_mean = canopy_residence_time_mean/60, #canopy res time to min
          canopy_consumption_tot_sum = canopy_consumption_tot_sum/1000, #kilograms to megagrams
-         surface_consumption_tot_sum = surface_consumption_tot_sum/1000)
+         surface_consumption_tot_sum = surface_consumption_tot_sum/1000,
+         total_power_sum = total_power_sum/1000000)
 
 write.csv(dat_site, here("QF_results","qf_results_site.csv"), row.names = F)
 
-ggpairs(dat_site[,5:14])
+dat_site_pairs <- dat_site
+names(dat_site_pairs)[3:14] <- c("Percent Burned at\nModerate to High Severity\non Steep Slopes",
+                                 "dNBR",
+                                 "Total Canopy\nConsumption (%)",
+                                 "Total Canopy\nConsumption (Mg/m3)",
+                                 "Average Canopy\nResidence Time (min)",
+                                 "Average Power (kW)",
+                                 "Total Consumption (%)",
+                                 "Average Max\nPower (kW/m3)",
+                                 "Total Surface\nConsumption (%)",
+                                 "Total Surface\nConsumption (Mg/m3)",
+                                 "Average Surface\nResidence Time (s)",
+                                 "Total Energy (GW)"
+                                 )
 
+corr_plot <- ggpairs(dat_site_pairs, 
+        columns = c(3,5:14), 
+        upper = list(continuous = corr_upper),
+        lower = list(continuous = corr_lower)) +
+  theme(strip.text.y = element_text(angle=0),
+        strip.text.x = element_text(angle=90),
+        axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
+
+ggsave("correlation_matrix_responses.png", plot = corr_plot, path = here("Plots"), width = 9, height=7.5)
+
+ggpairs(dat_site_pairs[3:4])
+
+########
 dat_long <- dat_site %>%
   pivot_longer(cols = 5:14,
                values_to = "val",

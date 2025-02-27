@@ -82,7 +82,8 @@ for(fire in fires){
   #   scale_fill_viridis_c() +
   #   theme_bw()
   
-  severity <- rast(here(fire,paste0(fire,"_Severity.tif")))
+  severity <- rast(here(fire,paste0(fire,"_SBS.tif")))
+  severity <- project(severity, "EPSG:5070")
   names(severity) <- "severity"
 
   nbasins <- nrow(basins_steep)
@@ -110,25 +111,25 @@ for(fire in fires){
   #   scale_fill_viridis_c() +
   #   theme_bw()
   
-  writeVector(basins_steep, here(fire, paste0(fire,"_basins_sensitivity.shp")), overwrite=T)
+  writeVector(basins_steep, here(fire, paste0(fire,"_basins_sensitivity_sbs.shp")), overwrite=T)
 }
 
 ## Determine severity cutoff using threshold_sensitivity_analysis.R
 
-severity_cutoff = 30
+severity_cutoff = 11
 for(fire in fires){
-  basins_steep <- vect(here(fire, paste0(fire,"_basins_sensitivity.shp")))
+  basins_steep <- vect(here(fire, paste0(fire,"_basins_sensitivity_sbs.shp")))
   basins_final <- basins_steep %>%
     mutate(severe = if_else(severe_per > severity_cutoff, 1, 0)) %>%
     mutate(severe = factor(severe))
 
   basins_sampled <- basins_final %>% slice_sample(n=10, by=severe)
-  writeVector(basins_sampled, here(fire, paste0(fire,"_sample_basins.shp")), overwrite=T)
+  writeVector(basins_sampled, here(fire, paste0(fire,"_sample_basins_sbs.shp")), overwrite=T)
 }
 
 ##############
-fire <- "CubCreek2"
-basins_sampled <- vect(here(fire,paste0(fire,"_sample_basins.shp")))
+fire <- "CedarCreek"
+basins_sampled <- vect(here(fire,paste0(fire,"_sample_basins_sbs.shp")))
 
 ggplot() +
   geom_spatvector(data=basins_sampled, aes(fill = severe)) +

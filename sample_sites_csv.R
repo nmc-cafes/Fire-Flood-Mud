@@ -8,7 +8,7 @@ states <- data.frame("state"=c(rep("CA",3),rep("WA",2)),
                      "fire"=fires)
 fire_list <- list()
 for(i in 1:length(fires)){
-  sites <- read_sf(here(fires[i],paste0(fires[i],"_sample_basins.shp")))
+  sites <- read_sf(here(fires[i],paste0(fires[i],"_sample_basins_sbs.shp")))
   sites <- st_centroid(sites) 
   sites$Fire_Name <- fires[i]
   sites$Fire_State <- states[states$fire==fires[i],]$state
@@ -30,4 +30,4 @@ sample_sites_df <- sample_sites %>%
   rename(Site_Name = site_name) %>%
   select(Fire_State,Fire_Name,Site_Name,X,Y)
 
-write.csv(sample_sites_df, here("Sample_Basins.csv"), row.names=F)
+write.csv(sample_sites_df, here("Sample_Basins_SBS.csv"), row.names=F)

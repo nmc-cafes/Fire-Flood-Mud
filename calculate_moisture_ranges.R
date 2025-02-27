@@ -82,6 +82,6 @@ climate_ranges %>%
   scale_y_continuous(
     limits=c(0,100),
     name = "Temperatrue (C)",
-    sec.axis = sec_axis( trans=~., name="Relative Humidity (%)")
+    sec.axis = sec_axis( transform=~., name="Relative Humidity (%)")
   )+
   theme_bw()
