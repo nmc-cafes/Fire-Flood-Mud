@@ -3,10 +3,12 @@ Run ensemble of sample sites
 Adapted from code provided by Zach Cope 2/15/24
 """
 
+from shutil import rmtree
 from pathlib import Path
 import subprocess
 from multiprocessing import Pool
 import os
+from quicfire_tools.inputs import QU_Simparams
 
 
 def main():
@@ -15,17 +17,21 @@ def main():
     ensemble_dir = Path("D:/Fire-Flood-Mud/QF_runs/SBS")
 
     # Get a list of all executable files in the directory
-    # fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
-    fires = ["CubCreek2", "Dixie", "KNP"]
+    fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+    # fires = ["Dixie", "KNP"]
     executables = []
     for fire in fires:
-        if fire == "CubCreek2":
-            for site in [17, 18, 19, 20]:
+        for site in range(1, 21):
+            output = os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}", "Output")
+            indexes = os.path.join(output, "fire_indexes.bin")
+            if os.path.exists(indexes) == False:
+                rmtree(output)
                 exe = os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}")
-                executables.append(exe)
-        else:
-            for site in range(1, 21):
-                exe = os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}")
+                simparams = QU_Simparams.from_file(
+                    os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}")
+                )
+                simparams.quic_domain_height = 3000
+                simparams.to_file(os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}"))
                 executables.append(exe)
     # Number of concurrent processes
     concurrent_processes = 3

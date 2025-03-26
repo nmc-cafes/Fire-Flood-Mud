@@ -17,9 +17,7 @@ def plot_array(x, title):
     plt.show()
 
 
-runs_dir = Path(
-    "/Users/ntutland/Documents/Projects/Fire-Flood-Mud/QF_runs/Severe_Steep"
-)
+runs_dir = Path("D:/Fire-Flood-Mud/QF_runs/SBS")
 
 
 def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -228,36 +226,35 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
     return max_react
 
 
-fires = ["Caldor", "CedarCreek", "Dixie", "KNP"]
+fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 for fire in fires:
     fire_dir = runs_dir / fire
     sites = [f"{fire[:3]}{i}" for i in range(1, 21)]
     for run in sites:
-        if run == "Cal16":
-            print(run)
-            runpath = fire_dir / run
-            sim_inputs = SimulationInputs.from_json(runpath / f"{run}.json")
-            nz, ny, nx = (
-                sim_inputs.quic_fire.nz,
-                sim_inputs.qu_simparams.ny,
-                sim_inputs.qu_simparams.nx,
-            )
-            sim_outputs = SimulationOutputs(runpath / "Output", nz, ny, nx)
+        print(run)
+        runpath = fire_dir / run
+        sim_inputs = SimulationInputs.from_json(runpath / f"{run}.json")
+        nz, ny, nx = (
+            sim_inputs.quic_fire.nz,
+            sim_inputs.qu_simparams.ny,
+            sim_inputs.qu_simparams.nx,
+        )
+        sim_outputs = SimulationOutputs(runpath / "Output", nz, ny, nx)
 
-            arrpath = runpath / "Arrays"
-            arrpath.mkdir(exist_ok=True)
+        arrpath = runpath / "Arrays"
+        arrpath.mkdir(exist_ok=True)
 
-            print("\t- getting mass burnt")
-            get_mass_burnt(sim_outputs, arrpath, False)
-            print("\t- getting surface fuel moisture")
-            get_surface_moisture(sim_outputs, arrpath, False)
-            print("\t- getting surface consumption")
-            get_surface_consumption(sim_outputs, arrpath, False)
-            print("\t- getting canopy consumption")
-            get_canopy_consumption(sim_outputs, arrpath, False)
-            print("\t- getting power variables")
-            get_power(sim_outputs, arrpath, False)
-            print("\t- getting canopy residence time")
-            get_canopy_residence_time(sim_outputs, arrpath, False)
-            # print("\t- getting max reaction rate")
-            # get_max_reaction_rate(sim_outputs, arrpath, True)
+        print("\t- getting mass burnt")
+        get_mass_burnt(sim_outputs, arrpath, False)
+        print("\t- getting surface fuel moisture")
+        get_surface_moisture(sim_outputs, arrpath, False)
+        print("\t- getting surface consumption")
+        get_surface_consumption(sim_outputs, arrpath, False)
+        print("\t- getting canopy consumption")
+        get_canopy_consumption(sim_outputs, arrpath, False)
+        print("\t- getting power variables")
+        get_power(sim_outputs, arrpath, False)
+        print("\t- getting canopy residence time")
+        get_canopy_residence_time(sim_outputs, arrpath, False)
+        # print("\t- getting max reaction rate")
+        # get_max_reaction_rate(sim_outputs, arrpath, True)
