@@ -4,10 +4,10 @@ from shutil import copytree
 dst_dir = Path(__file__).parent / "Arrays"
 dst_dir.mkdir(exist_ok=True)
 
-fires = ["Caldor", "CedarCreek", "Dixie", "KNP"]
+fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 
 for fire in fires:
-    fire_src = Path(__file__).parent / "QF_runs" / "Severe_Steep" / fire
+    fire_src = Path("D:/Fire-Flood-Mud") / "QF_runs" / "SBS" / fire
     fire_dst = dst_dir / fire
     fire_dst.mkdir(exist_ok=True)
     sites = [f"{fire[:3]}{i}" for i in range(1, 21)]
