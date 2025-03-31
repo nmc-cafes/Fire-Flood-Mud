@@ -64,7 +64,7 @@ def main():
     }
 
     for i in range(len(fire_gdf.index)):
-        if i >= 99:
+        if i >= 0:
             fire_name = fire_gdf.iloc[i]["Fire_Name"]
             site_name = fire_gdf.iloc[i]["Site_Name"]
             site_coords = fire_gdf.iloc[i]["geometry"]
@@ -80,10 +80,10 @@ def main():
                 margins,
                 moisture,
                 windspeed,
-                fastfuels_done=False,
-                duet_done=False,
-                calibration_done=False,
-                check_inputs=False,
+                fastfuels_done=True,
+                duet_done=True,
+                calibration_done=True,
+                check_inputs=True,
                 write_test_sim=False,
             )
             qf_run.run_fastfuels()
@@ -716,6 +716,7 @@ class QuicfireRun:
         treesfueldepth = _read_dat_file(
             self.qf_path, "treesfueldepth.dat", (self.nz, self.ny, self.nx)
         )
+        topo = _read_dat_file(self.qf_path, "topo.dat", (self.ny, self.nx))
         plot_array(treesrhof[0, :, :], "surface rhof")
         plot_array(treesmoist[0, :, :], "surface moist")
         plot_array(treesfueldepth[0, :, :], "surface fuel depth")
@@ -728,6 +729,7 @@ class QuicfireRun:
         # with open(self.qf_path / "ignite.dat") as file:
         #     for line in file:
         #         print(line)
+        plot_array(topo, "terrain")
 
         print(
             f"Dimensions from fastfuels: nx = {self.nx}, ny = {self.ny}, nz = {self.nz}"

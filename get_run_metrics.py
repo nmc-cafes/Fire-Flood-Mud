@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from scipy.io import FortranFile
 import pandas as pd
-import xarray as xr
+
+# import xarray as xr
 import zarr
 
 
@@ -17,9 +18,7 @@ def plot_array(x, title):
     plt.show()
 
 
-runs_dir = Path(
-    "/Users/ntutland/Documents/Projects/Fire-Flood-Mud/QF_runs/Severe_Steep"
-)
+runs_dir = Path("/Volumes/easystore/Fire-Flood-Mud/QF_runs/SBS")
 
 
 def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -161,34 +160,34 @@ def get_power(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     return max_power
 
 
-def get_fireline_intensity(
-    sim: SimulationOutputs, arrpath: Path, zarr_path: Path, plot: bool = True
-):
-    sim.to_zarr(zarr_path, outputs="surfEng", over_write=True)
-    ds = zarr.open(zarr_path)
-    # Calc time when cell experienced max power.
-    ds = ds.fillna(0)  # Convert nan to 0 for dask
-    xarr_max_power_time = ds.data.argmax("time")
-    xarr_max_power_time = xr.where(
-        xarr_max_power_time == 0, np.nan, xarr_max_power_time
-    )  # Convert 0 to nan. xarr_max_power_time of zero means it never burned.
+# def get_fireline_intensity(
+#     sim: SimulationOutputs, arrpath: Path, zarr_path: Path, plot: bool = True
+# ):
+#     sim.to_zarr(zarr_path, outputs="surfEng", over_write=True)
+#     ds = zarr.open(zarr_path)
+#     # Calc time when cell experienced max power.
+#     ds = ds.fillna(0)  # Convert nan to 0 for dask
+#     xarr_max_power_time = ds.data.argmax("time")
+#     xarr_max_power_time = xr.where(
+#         xarr_max_power_time == 0, np.nan, xarr_max_power_time
+#     )  # Convert 0 to nan. xarr_max_power_time of zero means it never burned.
 
-    # This creates an array of fireline intensities for every y transect at every timestep
-    dx = 2
-    y_time_firelineintensity = np.array(ds.data.sum(dim="x")) * dx
-    np.nan_to_num(y_time_firelineintensity, copy=False, nan=0.0)
+#     # This creates an array of fireline intensities for every y transect at every timestep
+#     dx = 2
+#     y_time_firelineintensity = np.array(ds.data.sum(dim="x")) * dx
+#     np.nan_to_num(y_time_firelineintensity, copy=False, nan=0.0)
 
-    # This uses the  xarr_max_power_time for each cell to map to the correct  y_time_firelineintensity value
-    t_indexes = np.array(xarr_max_power_time).flatten()
-    np.nan_to_num(t_indexes, copy=False, nan=0)
-    t_indexes = t_indexes.astype(int)
-    y_indexes = np.repeat(
-        np.arange(xarr_max_power_time.shape[0]), xarr_max_power_time.shape[1]
-    )
-    y_x_firelineintensity = y_time_firelineintensity[t_indexes, y_indexes]
-    y_x_firelineintensity = y_x_firelineintensity.reshape(xarr_max_power_time.shape)
-    xarr_FLI = xr.DataArray(y_x_firelineintensity, dims=("y", "x"))
-    xarr_FLI = xr.where(xarr_FLI == 0, np.nan, xarr_FLI)  # Replace 0 with np.nan
+#     # This uses the  xarr_max_power_time for each cell to map to the correct  y_time_firelineintensity value
+#     t_indexes = np.array(xarr_max_power_time).flatten()
+#     np.nan_to_num(t_indexes, copy=False, nan=0)
+#     t_indexes = t_indexes.astype(int)
+#     y_indexes = np.repeat(
+#         np.arange(xarr_max_power_time.shape[0]), xarr_max_power_time.shape[1]
+#     )
+#     y_x_firelineintensity = y_time_firelineintensity[t_indexes, y_indexes]
+#     y_x_firelineintensity = y_x_firelineintensity.reshape(xarr_max_power_time.shape)
+#     xarr_FLI = xr.DataArray(y_x_firelineintensity, dims=("y", "x"))
+#     xarr_FLI = xr.where(xarr_FLI == 0, np.nan, xarr_FLI)  # Replace 0 with np.nan
 
 
 def get_canopy_residence_time(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -228,36 +227,41 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
     return max_react
 
 
-fires = ["Caldor", "CedarCreek", "Dixie", "KNP"]
+fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 for fire in fires:
     fire_dir = runs_dir / fire
+    out_dir = Path(__file__).parent / "QF_results" / "SBS" / fire
+    out_dir.mkdir(exist_ok=True)
     sites = [f"{fire[:3]}{i}" for i in range(1, 21)]
     for run in sites:
-        if run == "Cal16":
-            print(run)
-            runpath = fire_dir / run
-            sim_inputs = SimulationInputs.from_json(runpath / f"{run}.json")
-            nz, ny, nx = (
-                sim_inputs.quic_fire.nz,
-                sim_inputs.qu_simparams.ny,
-                sim_inputs.qu_simparams.nx,
-            )
-            sim_outputs = SimulationOutputs(runpath / "Output", nz, ny, nx)
+        print(run)
+        runpath = fire_dir / run
+        print("  - getting simulation inputs")
+        sim_inputs = SimulationInputs.from_json(runpath / f"{run}.json")
+        nz, ny, nx = (
+            sim_inputs.quic_fire.nz,
+            sim_inputs.qu_simparams.ny,
+            sim_inputs.qu_simparams.nx,
+        )
+        print("  - getting simulation outputs")
+        sim_outputs = SimulationOutputs(runpath / "Output", nz, ny, nx)
 
-            arrpath = runpath / "Arrays"
-            arrpath.mkdir(exist_ok=True)
+        outpath = out_dir / run
+        outpath.mkdir(exist_ok=True)
 
-            print("\t- getting mass burnt")
-            get_mass_burnt(sim_outputs, arrpath, False)
-            print("\t- getting surface fuel moisture")
-            get_surface_moisture(sim_outputs, arrpath, False)
-            print("\t- getting surface consumption")
-            get_surface_consumption(sim_outputs, arrpath, False)
-            print("\t- getting canopy consumption")
-            get_canopy_consumption(sim_outputs, arrpath, False)
-            print("\t- getting power variables")
-            get_power(sim_outputs, arrpath, False)
-            print("\t- getting canopy residence time")
-            get_canopy_residence_time(sim_outputs, arrpath, False)
-            # print("\t- getting max reaction rate")
-            # get_max_reaction_rate(sim_outputs, arrpath, True)
+        PLOT = True if run == "Cal1" else False
+
+        print("\t- getting mass burnt")
+        get_mass_burnt(sim_outputs, outpath, PLOT)
+        print("\t- getting surface fuel moisture")
+        get_surface_moisture(sim_outputs, outpath, PLOT)
+        print("\t- getting surface consumption")
+        get_surface_consumption(sim_outputs, outpath, PLOT)
+        print("\t- getting canopy consumption")
+        get_canopy_consumption(sim_outputs, outpath, PLOT)
+        print("\t- getting power variables")
+        get_power(sim_outputs, outpath, PLOT)
+        print("\t- getting canopy residence time")
+        get_canopy_residence_time(sim_outputs, outpath, PLOT)
+        # print("\t- getting max reaction rate")
+        # get_max_reaction_rate(sim_outputs, arrpath, True)

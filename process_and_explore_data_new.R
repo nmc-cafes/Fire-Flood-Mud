@@ -4,6 +4,7 @@ library(skimr)
 library(ggthemes)
 library(GGally)
 library(scales)
+library(betareg)
 
 corr_upper <- function(data, mapping, method="p", use="pairwise", ...){
   
@@ -32,7 +33,7 @@ corr_lower <- function(data, mapping){
     theme_bw()
 }
 
-dat_raw <- read_csv(here("QF_results","qf_results.csv"))
+dat_raw <- read_csv(here("QF_results","SBS","qf_results.csv"))
 skim_without_charts(dat_raw)
 
 dat_ifd <- dat_raw %>%
@@ -62,11 +63,11 @@ dat_site <- dat_ifd %>%
          surface_consumption_tot_sum = surface_consumption_tot_sum/1000,
          total_power_sum = total_power_sum/1000000)
 
-write.csv(dat_site, here("QF_results","qf_results_site.csv"), row.names = F)
+write.csv(dat_site, here("QF_results","SBS","qf_results_site.csv"), row.names = F)
 
 dat_site_pairs <- dat_site
 names(dat_site_pairs)[3:14] <- c("Percent Burned at\nModerate to High Severity\non Steep Slopes",
-                                 "dNBR",
+                                 "Average dNBR",
                                  "Total Canopy\nConsumption (%)",
                                  "Total Canopy\nConsumption (Mg/m3)",
                                  "Average Canopy\nResidence Time (min)",
@@ -79,7 +80,7 @@ names(dat_site_pairs)[3:14] <- c("Percent Burned at\nModerate to High Severity\n
                                  "Total Energy (GW)"
                                  )
 
-corr_plot <- ggpairs(dat_site_pairs, 
+corr_plot_ss <- ggpairs(dat_site_pairs, 
         columns = c(3,5:14), 
         upper = list(continuous = corr_upper),
         lower = list(continuous = corr_lower)) +
@@ -87,9 +88,18 @@ corr_plot <- ggpairs(dat_site_pairs,
         strip.text.x = element_text(angle=90),
         axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
 
-ggsave("correlation_matrix_responses.png", plot = corr_plot, path = here("Plots"), width = 9, height=7.5)
+corr_plot_dnbr <- ggpairs(dat_site_pairs, 
+                        columns = c(4:14), 
+                        upper = list(continuous = corr_upper),
+                        lower = list(continuous = corr_lower)) +
+  theme(strip.text.y = element_text(angle=0),
+        strip.text.x = element_text(angle=90),
+        axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
 
-ggpairs(dat_site_pairs[3:4])
+ggsave("correlation_matrix_responses.png", plot = corr_plot_ss, path = here("Plots"), width = 9, height=7.5)
+
+corr_ss_dnbr <- ggpairs(dat_site_pairs[3:4])
+ggsave("correlation_ss_dnbr.png", plot = corr_ss_dnbr, path = here("Plots"), width=5, height= 5)
 
 ########
 dat_long <- dat_site %>%
@@ -145,6 +155,12 @@ canopy_cons_site
 
 
 ## Scatterplots
+dat_long_beta <- dat_long %>%
+  mutate(severity_pct = case_when(severity_pct==0 ~ 0.001,
+                                  severity_pct==1 ~ 0.999,
+                                  TRUE ~ severity_pct))
+# TODO: Do beta regressions for all predictors, predict, append to data, plot.
+
 ss_scatter <- dat_long %>%
   filter(var != "Total Power (kW)") %>%
   ggplot() +
@@ -160,7 +176,7 @@ ss_scatter <- dat_long %>%
   theme(legend.position = "inside",
         legend.position.inside = c(0.9, 0.2))
 ss_scatter
-ggsave("severe_steep_scatters.png",ss_scatter,path=here("Plots"),width=10, height=4)
+ggsave("severe_steep_scatters.jpg",ss_scatter,path=here("Plots"),width=10, height=4)
 
 dnbr_scatter <- dat_long %>%
   filter(var != "Total Power (kW)") %>%

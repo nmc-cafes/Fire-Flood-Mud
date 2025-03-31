@@ -16,6 +16,7 @@ output_to_rst <- function(output, out_arr, plot_bounds){
 
 process_output <- function(fire, site, output, domain, basin){
   out_arr <- read.table(here("QF_results",
+                             "SBS",
                              fire, 
                              site,
                              "Arrays",
@@ -26,8 +27,10 @@ process_output <- function(fire, site, output, domain, basin){
 }
 
 process_severity <- function(severity, out_rst){
-  dom_sev <- crop(severity,ext(out_rst))
+  out_rst_proj <- project(out_rst, crs(severity))
+  dom_sev <- crop(severity,ext(out_rst_proj))
   dom_sev <- project(dom_sev, out_rst, method="near")
+  dom_sev[is.na(dom_sev)] <- 1
   dom_sev[is.na(out_rst)] <- NA
   return(dom_sev)
 }
@@ -53,12 +56,13 @@ create_slope_mask <- function(slope, out_rst){
   slope_mask <- out_rst
   slope_mask[dom_slope>23] <- 1
   slope_mask[dom_slope<=23] <- 0
+  slope_mask[!slope_mask%in%c(0,1)] <- 0
   slope_mask[is.na(out_rst)] <- NA
   names(slope_mask) <- "steep"
   return(slope_mask)
 }
 
-fires <- c("Caldor","CedarCreek","Dixie","KNP")
+fires <- c("Caldor","CedarCreek","CubCreek2","Dixie","KNP")
 # fires <- c("KNP")
 outputs <- c("canopy_consumption_pct",
              "canopy_consumption_tot",
@@ -78,19 +82,18 @@ for(j in 1:length(fires)){
   cat(fires[j],"\n")
   fire_list <- list()
   dem <- rast(here(fires[j], paste0(fires[j],"_DEM.tif")))
-  severity <- rast(here(fires[j],paste0(fires[j],"_Severity.tif")))
+  severity <- rast(here(fires[j],paste0(fires[j],"_SBS.tif")))
   dnbr <- rast(here(fires[j],paste0(fires[j],"_dNBR.tif")))
   # tree_mortality <- rast(here("KNP","Tree_Survivorship","burn_severity_model_predictions.tif"))
   # tree_mortality <- project(tree_mortality, "EPSG:5070")
   slope <- terrain(dem, v="slope", unit="degree")
-  basins <- vect(here(fires[j],paste0(fires[j],"_sample_basins.shp")))
+  basins <- vect(here(fires[j],paste0(fires[j],"_sample_basins_sbs.shp")))
   for(i in 1:20){
     site <- paste0(substr(fires[j],1,3),i)
     cat("\t",site,"\n")
     domain <- vect(here(fires[j],"Sample_Basins",site,paste0(site,".shp")))
     basin <- basins[i]
     for(output in outputs){
-      cat("\t\t",output,"\n")
       out_rst <- process_output(fires[j],site,output,domain,basin)
       if(output == outputs[1]){
         dom_sev <- process_severity(severity,  out_rst)
@@ -116,6 +119,7 @@ for(j in 1:length(fires)){
                           # "mortality_large" = tm_large,
                           "dNBR" = dnbr_dat)
       }
+      cat("\t\t",output,"\n")
       out_dat <- values(out_rst, mat=F)
       out_dat <- out_dat[!is.na(out_dat)]
       site_df$new <- out_dat
@@ -131,6 +135,6 @@ for(j in 1:length(fires)){
 
 alldata_df <- bind_rows(alldata_list)
 
-write.csv(alldata_df, here("QF_results","qf_results.csv"), row.names=F)
+write.csv(alldata_df, here("QF_results","SBS","qf_results.csv"), row.names=F)
 # write.csv(alldata_df, here("QF_results","KNP_results.csv"), row.names=F)
 

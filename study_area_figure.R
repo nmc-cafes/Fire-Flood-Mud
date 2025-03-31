@@ -4,6 +4,7 @@ library(terra)
 library(tidyterra)
 library(ggthemes)
 library(patchwork)
+library(ggspatial)
 
 read_severity <- function(path){
   rst <- rast(path)
@@ -38,7 +39,8 @@ knp <- vect(here("KNP","KNP_perimeter.shp"))
 caldor <- vect(here("Caldor","Caldor_perimeter.shp"))
 dixie <- vect(here("Dixie","Dixie_perimeter.shp"))
 cedar <- vect(here("CedarCreek","CedarCreek_perimeter.shp"))
-fires <- vect(c(knp,caldor,dixie,cedar))
+cub <- vect(here("CubCreek2","CubCreek2_perimeter.shp"))
+fires <- vect(c(knp,caldor,dixie,cedar,cub))
 
 #inset map
 inset <- ggplot() +
@@ -55,39 +57,53 @@ knp_sev <- read_severity(here("KNP","KNP_severity.tif"))
 caldor_sev <- read_severity(here("Caldor","Caldor_severity.tif"))
 dixie_sev <- read_severity(here("Dixie","Dixie_severity.tif"))
 cedar_sev <- read_severity(here("CedarCreek","CedarCreek_severity.tif"))
+cub_sev <- read_severity(here("CubCreek2","CubCreek2_severity.tif"))
 
 mtbs_colors <-c("#006400","#7fffd4","#ffff00","#ff0000","#7fff00")
 
 knp_plot <- ggplot() + 
   geom_spatraster(data=knp_sev) + 
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
+  annotation_scale() +
   theme_void() +
   theme(legend.title = element_blank(),
-        legend.position = "bottom")
+        legend.position = "none")
 
 caldor_plot <- ggplot() + 
   geom_spatraster(data=caldor_sev) + 
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
+  annotation_scale() +
   theme_void() +
   theme(legend.title = element_blank(),
-        legend.position = "bottom")
+        legend.position = "none")
 
 dixie_plot <- ggplot() + 
   geom_spatraster(data=dixie_sev) + 
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
+  annotation_scale() +
   theme_void() +
   theme(legend.title = element_blank(),
-        legend.position = "bottom")
+        legend.position = "none")
 
 cedar_plot <- ggplot() + 
   geom_spatraster(data=cedar_sev) + 
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
+  annotation_scale() +
   theme_void() +
   theme(legend.title = element_blank(),
-        legend.position = "bottom")
+        legend.position = "none")
+
+cub_plot <- ggplot() + 
+  geom_spatraster(data=cub_sev) + 
+  scale_fill_manual(values = mtbs_colors, na.value = NA) +
+  annotation_scale() +
+  theme_void() +
+  theme(legend.title = element_blank(),
+        legend.position = "none")
 
 ggsave("allfires.png", inset, path = here("Plots","study_area_fig"), height = 5.5, width = 4)
 ggsave("knp.png", knp_plot, path = here("Plots","study_area_fig"), height = 4, width = 4)
 ggsave("caldor.png", caldor_plot, path = here("Plots","study_area_fig"), height = 4, width = 4)
 ggsave("dixie.png", dixie_plot, path = here("Plots","study_area_fig"), height = 4, width = 4)
 ggsave("cedar.png", cedar_plot, path = here("Plots","study_area_fig"), height = 4, width = 4)
+ggsave("cub.png", cub_plot, path = here("Plots","study_area_fig"), height = 4, width = 4)

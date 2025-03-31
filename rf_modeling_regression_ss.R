@@ -8,7 +8,7 @@ library(tidymodels)
 library(doParallel)
 library(scales)
 
-dat <- read.csv(here("QF_results","qf_results_site.csv"))
+dat <- read.csv(here("QF_results","SBS","qf_results_site.csv"))
 # dat <- dat %>% filter(severity_class != "low")
 
 dat <- dat %>%
@@ -70,7 +70,7 @@ tune_res %>%
   labs(x = NULL, y = "RMSE")
 
 rf_grid <- grid_regular(
-  mtry(range = c(1, 4)),
+  mtry(range = c(2, 8)),
   min_n(range = c(20, 40)),
   levels = 5
 )
@@ -91,7 +91,7 @@ regular_res %>%
   geom_point() +
   labs(y = "RMSE")
 
-best_rmse <- select_best(regular_res, "rmse")
+best_rmse <- select_best(regular_res, metric="rmse")
 
 final_rf <- finalize_model(
   tune_spec,
