@@ -30,8 +30,8 @@ months <- c("08","08","09","07","07")
 df_list <- list()
 
 for(i in 1:length(fires)){
-  cat(fires[i],"\n")
-  tmax <- rast(here("Climate_Data",
+ cat(fires[i],"\n")
+ tmax <- rast(here("Climate_Data",
                     paste0("PRISM_tmax_stable_4kmM3_2021",months[i],"_bil"),
                     paste0("PRISM_tmax_stable_4kmM3_2021",months[i],"_bil.bil")))
  tmin <- rast(here("Climate_Data",
