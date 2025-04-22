@@ -83,7 +83,7 @@ for(fire in fires){
   #   theme_bw()
   
   severity <- rast(here(fire,paste0(fire,"_SBS.tif")))
-  severity <- project(severity, "EPSG:5070")
+  severity <- project(severity, "EPSG:5070", method="near")
   names(severity) <- "severity"
 
   nbasins <- nrow(basins_steep)
@@ -116,7 +116,7 @@ for(fire in fires){
 
 ## Determine severity cutoff using threshold_sensitivity_analysis.R
 
-severity_cutoff = 11
+severity_cutoff = 25
 for(fire in fires){
   basins_steep <- vect(here(fire, paste0(fire,"_basins_sensitivity_sbs.shp")))
   basins_final <- basins_steep %>%
@@ -127,9 +127,28 @@ for(fire in fires){
   writeVector(basins_sampled, here(fire, paste0(fire,"_sample_basins_sbs.shp")), overwrite=T)
 }
 
+# for(fire in c("CedarCreek","CubCreek2")){
+#   basins_steep <- vect(here(fire, paste0(fire,"_basins_sensitivity_sbs.shp")))
+#   basins_final <- basins_steep %>%
+#     mutate(severe = if_else(severe_per > severity_cutoff, 1, 0)) %>%
+#     mutate(severe = factor(severe))
+#   
+#   basins_sampled <- basins_final %>% slice_sample(n=10, by=severe)
+#   writeVector(basins_sampled, here(fire, paste0(fire,"_sample_basins_sbs_CORRECTED.shp")), overwrite=T)
+# }
+# 
+# cedar_basins <- vect(here("CedarCreek","CedarCreek_sample_basins_sbs_CORRECTED.shp"))
+# cub_basins <- vect(here("CubCreek2","CubCreek2_sample_basins_sbs_CORRECTED.shp"))
+# 
+# cedar_basins_sample <- cedar_basins %>% filter(severe==1) %>% slice_sample(n=3)
+# cub_basins_sample <- cub_basins %>% filter(severe==1) %>% slice_sample(n=1)
+# 
+# writeVector(cedar_basins_sample, here("CedarCreek","CedarCreek_corrected_basins.shp"))
+# writeVector(cedar_basins_sample, here("CubCreek2","CubCreek2_corrected_basins.shp"))
+
 ##############
 fire <- "CedarCreek"
-basins_sampled <- vect(here(fire,paste0(fire,"_sample_basins_sbs.shp")))
+basins_sampled <- vect(here(fire,paste0(fire,"_sample_basins_sbs_CORRECTED.shp")))
 
 ggplot() +
   geom_spatvector(data=basins_sampled, aes(fill = severe)) +
@@ -163,6 +182,5 @@ ggplot() +
                   aes(fill=severe_per)) +
   scale_fill_gradient2() +
   theme_bw()
-
 
 
