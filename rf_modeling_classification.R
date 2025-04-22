@@ -7,11 +7,12 @@ library(tidyverse)
 library(tidymodels)
 library(doParallel)
 library(themis)
+library(vip)
 
 ### First with multiple classes
-dat <- read.csv(here("QF_results","qf_results_site.csv"))
+dat <- read.csv(here("QF_results","SBS","qf_results_site.csv"))
 dat <- dat %>%
-  mutate(severity_class = if_else(severity_pct > 0.3, 1, 0)) %>%
+  mutate(severity_class = if_else(severity_pct > 0.22, 1, 0)) %>%
   mutate(severity_class = factor(severity_class))
 
 set.seed(47)
@@ -72,8 +73,8 @@ tune_res %>%
   labs(x = NULL, y = "ROC_AUC")
 
 rf_grid <- grid_regular(
-  mtry(range = c(1,8)),
-  min_n(range = c(1,40)),
+  mtry(range = c(1,6)),
+  min_n(range = c(10,40)),
   levels = 8
 )
 
@@ -94,14 +95,12 @@ regular_res %>%
   geom_point() +
   labs(y = "roc_auc")
 
-best_auc <- select_best(regular_res, "roc_auc")
+best_auc <- select_best(regular_res, metric="roc_auc")
 
 final_rf <- finalize_model(
   tune_spec,
   best_auc
 )
-
-library(vip)
 
 dat_prep <- prep(dat_rec)
 final_rf %>%

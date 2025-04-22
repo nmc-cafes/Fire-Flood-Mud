@@ -1,5 +1,6 @@
 library(here)
 library(tidyverse)
+library(ggthemes)
 
 reg.output.search.with.test<- function (search_object) {  ## input an object from a regsubsets search
   ## First build a df listing model components and metrics of interest
@@ -45,7 +46,7 @@ reg.output.search.with.test<- function (search_object) {  ## input an object fro
 
 library(leaps)
 
-dat_site <- read.csv(here("QF_results","qf_results_site.csv"))
+dat_site <- read.csv(here("QF_results","SBS","qf_results_site.csv"))
 
 # dat_loglog <- dat_site %>%
 #   mutate(across(c(dNBR,surface_consumption,canopy_consumption, max_power, residence_time_power), log))

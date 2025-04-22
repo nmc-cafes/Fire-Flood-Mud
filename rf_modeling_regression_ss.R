@@ -7,12 +7,13 @@ library(tidyverse)
 library(tidymodels)
 library(doParallel)
 library(scales)
+library(vip)
 
 dat <- read.csv(here("QF_results","SBS","qf_results_site.csv"))
 # dat <- dat %>% filter(severity_class != "low")
 
 dat <- dat %>%
-  mutate(severity_class = if_else(severity_pct > 0.3, 1, 0))
+  mutate(severity_class = if_else(severity_pct > 0.11, 1, 0))
 
 set.seed(47)
 dat_split <- initial_split(dat, strata = severity_class)
@@ -70,8 +71,8 @@ tune_res %>%
   labs(x = NULL, y = "RMSE")
 
 rf_grid <- grid_regular(
-  mtry(range = c(2, 8)),
-  min_n(range = c(20, 40)),
+  mtry(range = c(1, 8)),
+  min_n(range = c(1, 40)),
   levels = 5
 )
 
@@ -97,8 +98,6 @@ final_rf <- finalize_model(
   tune_spec,
   best_rmse
 )
-
-library(vip)
 
 dat_prep <- prep(dat_rec)
 final_rf %>%
@@ -129,5 +128,6 @@ final_res %>%
        y="Predicted Severe-Steep Percent") +
   theme_bw() +
   theme(aspect.ratio = 1)
-  
+
+ggsave("rf_fes_ss.jpg",path = here("Plots"), height = 3, width = 3)
   
