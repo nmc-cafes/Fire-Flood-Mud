@@ -9,18 +9,25 @@ library(here)
 
 # load shapefile
 fires <- c("KNP","Caldor","CedarCreek","CubCreek2","Dixie")
+# fires <- c("CedarCreek","CubCreek2")
 for(fire in fires){
   cat(fire,"\n")
-  polygons <- vect(here(fire,paste0(fire,"_sample_basins_sbs.shp")))
+  # polygons <- vect(here(fire,paste0(fire,"_sample_basins_sbs.shp")))
+  polygons <- vect(here(fire,paste0(fire,"_corrected_basins.shp")))
   # plot(polygons)
-  
+  # basins_corrected_dir <- here(fire,"Sample_Basins_corrected")
+  # if(!dir.exists(basins_corrected_dir)) {
+  #   dir.create(basis_corrected_dir)
+  # }
   # loop through each polygon
   for (i in 1:nrow(polygons)) {
     basin_name <- paste0(substr(fire, start = 1, stop = 3),i)
+    # basin_name <- paste0(substr(fire, start = 1, stop = 3),i,"_COR")
     cat("   ",basin_name,"\n")
     
     # create an output directory if it doesn't exist
     output_dir <- here(fire,"Sample_Basins",basin_name)
+    # output_dir <- here(fire,"Sample_Basins_corrected",basin_name)
     if (!dir.exists(output_dir)) {
       dir.create(output_dir)
     }
@@ -48,13 +55,13 @@ for(fire in fires){
 
 
 # Check the result
-test_fire <- "Caldor"
-test_num <- 14
-test_name <- paste0(substr(test_fire, start = 1, stop = 3),test_num)
-test_basins <- vect(here(test_fire,paste0(test_fire,"_sample_basins_sbs.shp")))
+test_fire <- "CedarCreek"
+test_num <- 1
+test_name <- paste0(substr(test_fire, start = 1, stop = 3),test_num,"_COR")
+test_basins <- vect(here(test_fire,paste0(test_fire,"_corrected_basins.shp")))
 test_basin <- test_basins[test_num, ]
 test_bbox <- vect(ext(test_basin), crs=crs(test_basin))
-test_domain <- vect(here(test_fire,"Sample_Basins",test_name,paste0(test_name,".shp")))
+test_domain <- vect(here(test_fire,"Sample_Basins_corrected",test_name,paste0(test_name,".shp")))
 plot(test_domain)
 plot(test_basin, add=T)
 plot(test_bbox, lty="dashed", add=T)
