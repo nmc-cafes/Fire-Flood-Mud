@@ -46,7 +46,7 @@ reg.output.search.with.test<- function (search_object) {  ## input an object fro
 
 library(leaps)
 
-dat_site <- read.csv(here("QF_results","SBS","qf_results_site.csv"))
+dat_site <- read.csv(here("QF_results","SBS","qf_results_site_corrected.csv"))
 
 # dat_loglog <- dat_site %>%
 #   mutate(across(c(dNBR,surface_consumption,canopy_consumption, max_power, residence_time_power), log))
@@ -150,7 +150,6 @@ folds <- sample(1:k, nrow(dat_site), replace = TRUE)
 cv_errors <- matrix(NA, k, 150, dimnames = list(NULL, paste(1:150)))
 
 for(j in 1:k) {
-  
   # perform best subset on rows not equal to j
   best_subset_j <- regsubsets(dNBR_mean ~ 
                                 surface_consumption_tot_sum *
@@ -160,7 +159,8 @@ for(j in 1:k) {
                                 surface_residence_time_mean *
                                 canopy_residence_time_mean,
                               dat_site[folds != j, ], 
-                              nvmax = 10,
+                              nbest = 30,
+                              nvmax = 5,
                               really.big=T)
   
   # perform cross-validation
@@ -182,21 +182,25 @@ final_best <- regsubsets(dNBR_mean ~
                            surface_residence_time_mean *
                            canopy_residence_time_mean,
                          data = dat_site,
-                         nvmax = 10,
+                         nbest = 30,
+                         nvmax = 5,
                          really.big = T)
 coef(final_best, which.min(mean_cv_errors))
 
 
 # what is the r-squared, rmse?
+# final_mod <- lm(severity_pct ~ 
+#                   canopy_residence_time_mean +
+#                   energy_flux_mean:surface_residence_time_mean +
+#                   surface_consumption_tot_sum:canopy_residence_time_mean +
+#                   surface_consumption_tot_sum:max_power_mean:energy_flux_mean:surface_residence_time_mean,
+#                 data=dat_site)
 final_mod <- lm(severity_pct ~ 
-                  canopy_residence_time_mean +
-                  energy_flux_mean:surface_residence_time_mean +
-                  surface_consumption_tot_sum:canopy_residence_time_mean +
-                  surface_consumption_tot_sum:max_power_mean:energy_flux_mean:surface_residence_time_mean,
+                  surface_consumption_tot_sum:canopy_consumption_tot_sum,
                 data=dat_site)
 summary(final_mod)
 library(performance)
-check_model(final_mod)
+model_check <- check_model(final_mod)
 
 #############
 
@@ -220,38 +224,105 @@ mod_mixed <- lmer(severity_pct ~
 summary(mod_mixed)
 AICc(mod_mixed)
 
-# mass_burnt should not be used with either of the percent consumption variables
+# no need to use mass burnt since it is just surface + canopy consumption
 # only one of consumption_tot and consumption_pct should be used
-for(i in 1:length(dat_subsets)){
-  f1 <- severity_pct ~ mass_burnt_pct + (1|fire)
-  f2 <- severity_pct ~ mass_burnt_pct + max_power_mean + (1|fire)
-  f3 <- severity_pct ~ mass_burnt_pct + energy_flux_mean + (1|fire)
-  f4 <- severity_pct ~ mass_burnt_pct + max_power_mean + energy_flux_mean + (1|fire)
-  f5 <- severity_pct ~ mass_burnt_pct + max_power_mean*enerby_flux_mean (1|fire)
-  f6 <- severity_pct ~ max_power_mean + (1|fire)
-  f7 <- severity_pct ~ energy_flux_mean + (1|fire)
-  f8 <- severity_pct ~ max_power_mean + energy_flux_mean + (1|fire)
-  f9 <- severity_pct ~ max_power_mean*enerby_flux_mean (1|fire)
 
-  
-  formulae <- c(f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,f21,f22,f23,
-                f24,f25,f26,f27)
-  aic_df <- tibble("model" = seq(1,length(formulae)), "AICc" = rep(NA, length(formulae)))
-  for(j in 1:length(formulae)){
-    mod <- lmer(formulae[j][[1]], data = dat_scaled)
-    aicc <- AICc(mod)
-    aic_df$AICc[j] <- aicc
-  }
-  
-  ggplot(aic_df, aes(model,AICc)) + geom_point()
-  selected <- paste0("f",aic_df[which.min(aic_df$AICc),"model"])
-  final_model <- lmer(get(selected), data = dat_scaled)
-  mod_sim <- simulateResiduals(final_model)
-  plot(mod_sim)
-  print(summary(final_model))
-  print(r.squaredGLMM(final_model))
+## Predictors that are NOT correlated
+# mass_burnt_pct_mean X canopy_consumption_tot_sum
+# surface_consumption_tot_sum X canopy_consumption_tot_sum
+# mass_burnt_pct_mean X canopy_residence_time_mean
+# mass_burn_pct_mean X surface_consumption_tot_sum
+# ^basically this is saying that surface and canopy consumption aren't correlated
+
+f1 <- severity_pct ~ canopy_consumption_pct_mean + (1|fire)
+f2 <- severity_pct ~ surface_consumption_pct_mean + (1|fire)
+f3 <- severity_pct ~ canopy_consumption_pct_mean + surface_consumption_pct_mean + (1|fire)
+
+f4 <- severity_pct ~ canopy_consumption_pct_mean + max_power_mean + (1|fire)
+f5 <- severity_pct ~ surface_consumption_pct_mean + max_power_mean + (1|fire)
+f6 <- severity_pct ~ canopy_consumption_pct_mean + surface_consumption_pct_mean + max_power_mean + (1|fire)
+
+f7 <- severity_pct ~ canopy_consumption_pct_mean + canopy_residence_time_mean + (1|fire)
+f8 <- severity_pct ~ surface_consumption_pct_mean + canopy_residence_time_mean + (1|fire)
+f9 <- severity_pct ~ canopy_consumption_pct_mean + surface_consumption_pct_mean + canopy_residence_time_mean + (1|fire)
+f10 <- severity_pct ~ canopy_consumption_pct_mean + surface_residence_time_mean + (1|fire)
+f11 <- severity_pct ~ surface_consumption_pct_mean + surface_residence_time_mean + (1|fire)
+f12 <- severity_pct ~ canopy_consumption_pct_mean + surface_consumption_pct_mean + surface_residence_time_mean + (1|fire)
+f13 <- severity_pct ~ canopy_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+f14 <- severity_pct ~ surface_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+f15 <- severity_pct ~ canopy_consumption_pct_mean + surface_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+
+f16 <- severity_pct ~ canopy_consumption_pct_mean + canopy_residence_time_mean + max_power_mean + (1|fire)
+f17 <- severity_pct ~ surface_consumption_pct_mean + canopy_residence_time_mean + max_power_mean + (1|fire)
+f18 <- severity_pct ~ canopy_consumption_pct_mean + surface_consumption_pct_mean + canopy_residence_time_mean + max_power_mean + (1|fire)
+f19 <- severity_pct ~ canopy_consumption_pct_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f20 <- severity_pct ~ surface_consumption_pct_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f21 <- severity_pct ~ canopy_consumption_pct_mean + surface_consumption_pct_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f22 <- severity_pct ~ canopy_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f23 <- severity_pct ~ surface_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f24 <- severity_pct ~ canopy_consumption_pct_mean + surface_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+
+f26 <- severity_pct ~ max_power_mean + (1|fire)
+
+f27 <- severity_pct ~ canopy_residence_time_mean + (1|fire)
+f28 <- severity_pct ~ surface_residence_time_mean + (1|fire)
+f29 <- severity_pct ~ canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+
+f30 <- severity_pct ~ canopy_residence_time_mean + max_power_mean + (1|fire)
+f31 <- severity_pct ~ surface_residence_time_mean + max_power_mean + (1|fire)
+f32 <- severity_pct ~ canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+
+f33 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean + (1|fire)
+f34 <- severity_pct ~ canopy_consumption_pct_mean*max_power_mean + (1|fire)
+f35 <- severity_pct ~ surface_consumption_pct_mean*max_power_mean + (1|fire)
+f36 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*max_power_mean + (1|fire)
+
+f37 <- severity_pct ~ canopy_consumption_pct_mean*canopy_residence_time_mean + (1|fire)
+f38 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean + (1|fire)
+f39 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean + (1|fire)
+f40 <- severity_pct ~ canopy_consumption_pct_mean*surface_residence_time_mean + (1|fire)
+f41 <- severity_pct ~ surface_consumption_pct_mean*surface_residence_time_mean + (1|fire)
+f42 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*surface_residence_time_mean + (1|fire)
+f43 <- severity_pct ~ canopy_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean + (1|fire)
+f44 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean + (1|fire)
+f45 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean + (1|fire)
+
+f46 <- severity_pct ~ canopy_consumption_pct_mean*canopy_residence_time_mean*max_power_mean + (1|fire)
+f47 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean*max_power_mean + (1|fire)
+f48 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean*max_power_mean + (1|fire)
+f49 <- severity_pct ~ canopy_consumption_pct_mean*surface_residence_time_mean*max_power_mean + (1|fire)
+f50 <- severity_pct ~ surface_consumption_pct_mean*surface_residence_time_mean*max_power_mean + (1|fire)
+f51 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*surface_residence_time_mean*max_power_mean + (1|fire)
+f52 <- severity_pct ~ canopy_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean*max_power_mean + (1|fire)
+f53 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean*max_power_mean + (1|fire)
+f54 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean*max_power_mean + (1|fire)
+
+formulae <- c(f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,
+              f21,f22,f23,f24,f26,f27,f28,f29,f30,f31,f32,f33,f34,f35,f36,f37,f38,f39,f40,
+              f41,f42,f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f53,f54)
+aic_df <- tibble("model" = seq(1,length(formulae)), "AICc" = rep(NA, length(formulae)))
+for(j in 1:length(formulae)){
+  print(j)
+  mod <- lmer(formulae[j][[1]], data = dat_site)
+  aicc <- AICc(mod)
+  aic_df$AICc[j] <- aicc
 }
 
+ggplot(aic_df, aes(model,AICc)) + geom_point()
+selected <- paste0("f",aic_df[which.min(aic_df$AICc),"model"])
+final_model <- lmer(get(selected), data = dat_site)
+mod_sim <- simulateResiduals(final_model)
+plot(mod_sim)
+print(summary(final_model))
+print(r.squaredGLMM(final_model))
+
+dat_site %>%
+  ggplot(aes(canopy_consumption_pct_mean,severity_pct,color=fire)) +
+  geom_point() +
+  geom_smooth(method="lm", se=F) +
+  scale_color_colorblind() +
+  theme_bw()
+  
 
 ###########
 # GAM

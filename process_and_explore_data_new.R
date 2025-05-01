@@ -34,9 +34,23 @@ corr_lower <- function(data, mapping){
 }
 
 dat_raw <- read_csv(here("QF_results","SBS","qf_results.csv"))
-skim_without_charts(dat_raw)
+dat_cor_raw <- read_csv(here("QF_results","SBS","qf_results_corrected.csv"))
+# skim_without_charts(dat_raw)
 
-dat_ifd <- dat_raw %>%
+set.seed(987654321)
+random <- sample.int(20,1)
+sites_to_replace <- c("Ced2","Ced14",paste0("Ced",random),"Cub14")
+
+dat_replace <- dat_raw %>%
+  filter(!site %in% sites_to_replace)
+dat_cor_replace <- dat_cor_raw %>%
+  mutate(site = case_when(site=="Ced1_COR" ~ sites_to_replace[1],
+                          site=="Ced2_COR" ~ sites_to_replace[2],
+                          site=="Ced3_COR" ~ sites_to_replace[3],
+                          site=="Cub1_COR" ~ sites_to_replace[4]))
+
+dat_replaced <- bind_rows(dat_replace, dat_cor_replace)
+dat_ifd <- dat_replaced %>%
   mutate(canopy_rhof_init = canopy_consumption_tot/canopy_consumption_pct,
          surface_rhof_init = surface_consumption_tot/surface_consumption_pct) %>%
   mutate(total_rhof_init = canopy_rhof_init + surface_rhof_init)
@@ -63,7 +77,7 @@ dat_site <- dat_ifd %>%
          surface_consumption_tot_sum = surface_consumption_tot_sum/1000,
          total_power_sum = total_power_sum/1000000)
 
-write.csv(dat_site, here("QF_results","SBS","qf_results_site.csv"), row.names = F)
+write.csv(dat_site, here("QF_results","SBS","qf_results_site_corrected.csv"), row.names = F)
 
 dat_site_pairs <- dat_site
 names(dat_site_pairs)[3:14] <- c("Percent Burned at\nModerate to High Severity\non Steep Slopes",
