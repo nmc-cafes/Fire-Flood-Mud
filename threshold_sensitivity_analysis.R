@@ -47,9 +47,9 @@ weighted_avg <- sum(fires_kfact$weighted_value, na.rm = TRUE) / sum(fires_kfact$
 
 # from NOAA Atlas 14
 caldor_rain <- c(8,6)
-dixie_rain <- c(6,8,8,9,10,8,6,8)
+dixie_rain <- c(6,9,8,10,10,8,8,8)
 knp_rain <- c(7,10,10)
-avg_rain <- mean(c(caldor_rain, dixie_rain, knp_rain))
+avg_rain <- round(mean(c(caldor_rain, dixie_rain, knp_rain)))
 
 ###
 fires <- c("Caldor","Dixie","KNP","CedarCreek","CubCreek2")
