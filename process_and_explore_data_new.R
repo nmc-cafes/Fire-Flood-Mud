@@ -78,6 +78,7 @@ dat_site <- dat_ifd %>%
          total_power_sum = total_power_sum/1000000)
 
 write.csv(dat_site, here("QF_results","SBS","qf_results_site_corrected.csv"), row.names = F)
+dat_site <- read_csv(here("QF_results","SBS","qf_results_site_corrected.csv"))
 
 dat_site_pairs <- dat_site
 names(dat_site_pairs)[3:14] <- c("Percent Burned at\nModerate to High Severity\non Steep Slopes",
@@ -169,17 +170,59 @@ canopy_cons_site
 
 
 ## Scatterplots
-dat_long_beta <- dat_long %>%
+dat_beta <- dat_site %>%
   mutate(severity_pct = case_when(severity_pct==0 ~ 0.001,
                                   severity_pct==1 ~ 0.999,
                                   TRUE ~ severity_pct))
 # TODO: Do beta regressions for all predictors, predict, append to data, plot.
+betapred_list <- list()
+j <- 1
+for(col in 5:14){
+  pred <- names(dat_beta)[col]
+  formula <- as.formula(paste("severity_pct ~", pred))
+  betamod <- betareg(formula, data=dat_beta, link="logit")
+  betapred <- tibble(pred = seq(0,max(dat_beta[pred]),(max(dat_beta[pred])/500)))
+  names(betapred) <- pred
+  betapred$pred <- predict(betamod, betapred, type="response")
+  names(betapred) <- c(paste0(pred,".val"), paste0(pred,".severity_pct"))
+  betapred_list[[j]] <- betapred
+  j <- j + 1
+}
+beta_pred <- bind_cols(betapred_list) %>%
+  pivot_longer(cols = everything(),
+               names_to = c("var", ".value"),
+               names_sep = "\\.") %>%
+  mutate(var = factor(var, 
+                      levels = c("surface_consumption_tot_sum",
+                                 "surface_consumption_pct_mean",
+                                 "canopy_consumption_tot_sum",
+                                 "canopy_consumption_pct_mean",
+                                 "mass_burnt_pct_mean",
+                                 "surface_residence_time_mean",
+                                 "canopy_residence_time_mean",
+                                 "max_power_mean",
+                                 "total_power_sum",
+                                 "energy_flux_mean"),
+                      labels = c("Total Surface\nConsumption (Mg/m3)",
+                                 "Total Surface\nConsumption (%)",
+                                 "Total Canopy\nConsumption (Mg/m3)",
+                                 "Total Canopy\nConsumption (%)",
+                                 "Total Consumption (%)",
+                                 "Average Surface\nResidence Time (s)",
+                                 "Average Canopy\nResidence Time (min)",
+                                 "Average Max\nPower (kW/m3)",
+                                 "Total Power (kW)",
+                                 "Average Power (kW)")))
 
-ss_scatter <- dat_long %>%
-  filter(var != "Total Power (kW)") %>%
-  ggplot() +
-  geom_point(aes(val,severity_pct,color=fire)) +
-  geom_smooth(aes(val,severity_pct), method="lm", color = "black") +
+dat_long <- dat_long %>%
+  filter(var != "Total Power (kW)")
+beta_pred <- beta_pred %>%
+  filter(var != "Total Power (kW)")
+
+ss_scatter <- ggplot(mapping = aes(val,severity_pct)) +
+  geom_point(data = dat_long, aes(color=fire)) +
+  geom_line(data = beta_pred) +
+  # geom_smooth(data = dat_long, method = "lm", color = "blue") +
   facet_wrap(.~var, scales="free_x", nrow = 2) +
   scale_color_colorblind() +
   scale_y_continuous(labels = percent_format()) +

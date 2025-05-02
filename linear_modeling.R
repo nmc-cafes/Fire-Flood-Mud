@@ -1,6 +1,7 @@
 library(here)
 library(tidyverse)
 library(ggthemes)
+library(scales)
 
 reg.output.search.with.test<- function (search_object) {  ## input an object from a regsubsets search
   ## First build a df listing model components and metrics of interest
@@ -208,8 +209,13 @@ model_check <- check_model(final_mod)
 library(lmerTest)
 library(MuMIn)
 library(DHARMa)
+library(glmmTMB)
 
-mod_mixed <- lmer(severity_pct ~ 
+dat_beta <- dat_site %>%
+  mutate(severity_pct = case_when(severity_pct==0 ~ 0.001,
+                                  severity_pct==1 ~ 0.999,
+                                  TRUE ~ severity_pct))
+mod_mixed <- glmmTMB(severity_pct ~ 
                     mass_burnt_pct_mean + 
                     surface_consumption_tot_sum +
                     surface_consumption_pct_mean +
@@ -220,7 +226,8 @@ mod_mixed <- lmer(severity_pct ~
                     surface_residence_time_mean +
                     canopy_residence_time_mean +
                     (1 | fire),
-                  data=dat_site)
+                    family = beta_family(link="logit"),
+                  data=dat_beta)
 summary(mod_mixed)
 AICc(mod_mixed)
 
@@ -298,31 +305,68 @@ f53 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean*su
 f54 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean*max_power_mean + (1|fire)
 
 formulae <- c(f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,
-              f21,f22,f23,f24,f26,f27,f28,f29,f30,f31,f32,f33,f34,f35,f36,f37,f38,f39,f40,
-              f41,f42,f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f53,f54)
+              f21,f22,f23,f24,f26,f27,f28,f29,f30,f31,f32)
 aic_df <- tibble("model" = seq(1,length(formulae)), "AICc" = rep(NA, length(formulae)))
 for(j in 1:length(formulae)){
   print(j)
-  mod <- lmer(formulae[j][[1]], data = dat_site)
+  mod <- glmmTMB(formulae[j][[1]], 
+                 family=beta_family(link="logit"), 
+                 data = dat_beta,
+                 control = glmmTMBControl(rank_check = "adjust"))
   aicc <- AICc(mod)
   aic_df$AICc[j] <- aicc
 }
 
 ggplot(aic_df, aes(model,AICc)) + geom_point()
 selected <- paste0("f",aic_df[which.min(aic_df$AICc),"model"])
-final_model <- lmer(get(selected), data = dat_site)
+final_model <- glmmTMB(get(selected), 
+                       family=beta_family(link="logit"), 
+                       data = dat_beta,
+                       control = glmmTMBControl(rank_check = "adjust"))
 mod_sim <- simulateResiduals(final_model)
 plot(mod_sim)
 print(summary(final_model))
 print(r.squaredGLMM(final_model))
 
-dat_site %>%
-  ggplot(aes(canopy_consumption_pct_mean,severity_pct,color=fire)) +
-  geom_point() +
-  geom_smooth(method="lm", se=F) +
-  scale_color_colorblind() +
+library(car)
+vif(lm(severity_pct ~ canopy_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean, 
+    data=dat_beta), type = "predictor")
+
+library(performance)
+check_singularity(final_model)
+check_collinearity(final_model)
+
+# see if it's different/not singular without a random effect
+final_model_fixed <- glmmTMB(severity_pct ~ canopy_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean,
+                             family=beta_family(link="logit"), 
+                             data = dat_beta)
+mod_sim_fixed <- simulateResiduals(final_model_fixed)
+plot(mod_sim_fixed)
+print(summary(final_model_fixed))
+
+library(rcompanion)
+Actual    = dat_beta$severity_pct
+Predicted = predict(final_model_fixed, type="response")
+Residuals = residuals(final_model_fixed)
+efronRSquared(residual = Residuals, 
+              predicted = Predicted, 
+              statistic = "EfronRSquared")
+
+rmse(final_model_fixed)
+check_singularity(final_model_fixed)
+check_collinearity(final_model_fixed)
+
+ggplot(mapping=aes(Actual,Predicted)) +
+  geom_abline(slope=1, intercept=c(0,0), color="red",linetype="dashed") +
+  geom_point(shape=1) +
+  coord_equal() +
+  scale_x_continuous(limits = c(0,1), labels = percent_format()) +
+  scale_y_continuous(limits = c(0,1), labels = percent_format()) +
+  labs(x="Observed Severe-Steep Percent",
+       y="Predicted Severe-Steep Percent") +
   theme_bw()
-  
+
+ggsave("beta_glmm_resid.jpg",path = here("Plots"), height = 3, width = 3)
 
 ###########
 # GAM
