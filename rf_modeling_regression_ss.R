@@ -117,7 +117,7 @@ final_res <- final_wf %>%
 final_res %>%
   collect_metrics()
 
-final_res %>%
+reg_res <- final_res %>%
   collect_predictions() %>%
   ggplot() +
   geom_point(aes(severity_pct,.pred), shape=1, alpha=0.5) +
@@ -130,4 +130,32 @@ final_res %>%
   theme(aspect.ratio = 1)
 
 ggsave("rf_fes_ss.jpg",path = here("Plots"), height = 3, width = 3)
-  
+
+
+# Results from rf_modeling_classification
+TClass <- factor(c("Low Risk", "Low Risk", "High Risk", "High Risk"), 
+                 levels = c("Low Risk","High Risk"))
+PClass <- factor(c("Low Risk", "High Risk", "Low Risk", "High Risk"),
+                 levels = c("High Risk","Low Risk"))
+Y      <- c(4,9,4,9)
+conf_df <- data.frame(TClass, PClass, Y)
+
+binom_conf <- ggplot(data = conf_df, 
+                     mapping = aes(x = TClass, y = PClass)) +
+  geom_tile(aes(fill = Y), colour = "black") +
+  geom_text(aes(label = sprintf("%1.0f", Y)), 
+            vjust = 1) +
+  scale_fill_gradient(low = "white", high = "gray50") +
+  scale_x_discrete(expand = c(0,0), position = "top") +
+  scale_y_discrete(expand = c(0,0)) +
+  labs(x="Truth",
+       y="Prediction") +
+  coord_equal() +
+  theme_bw() + 
+  theme(legend.position = "none",
+        axis.ticks=element_blank(),
+        axis.text.y = element_text(angle=90, hjust = 0.5))
+
+free(reg_res) + free(binom_conf)
+ggsave("rf_results.jpg", path=here("Plots"), height = 3, width=6)
+
