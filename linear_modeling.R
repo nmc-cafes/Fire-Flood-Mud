@@ -123,6 +123,7 @@ Residuals = residuals(final_model_fixed)
 efronRSquared(residual = Residuals, 
               predicted = Predicted, 
               statistic = "EfronRSquared")
+rmse_final <- sqrt(mean(residuals(final_model_fixed)^2))
 
 # rmse(final_model_fixed)
 check_singularity(final_model_fixed)
