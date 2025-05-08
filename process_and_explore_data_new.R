@@ -38,16 +38,22 @@ dat_cor_raw <- read_csv(here("QF_results","SBS","qf_results_corrected.csv"))
 # skim_without_charts(dat_raw)
 
 set.seed(987654321)
-random <- sample.int(20,1)
-sites_to_replace <- c("Ced2","Ced14",paste0("Ced",random),"Cub14")
+cub_lowseverity <- dat_raw %>%
+  group_by(site, fire) %>%
+  summarize(severity_pct = sum(severity %in% c(3,4) & steep==1) / sum(severity > 0)) %>%
+  filter(fire=="CubCreek2",
+         severity_pct <= 0.25) %>%
+  pull(site)
+cub_random <- sample(cub_lowseverity, 3)
+sites_to_replace <- c("Ced14", cub_random)
 
 dat_replace <- dat_raw %>%
   filter(!site %in% sites_to_replace)
 dat_cor_replace <- dat_cor_raw %>%
   mutate(site = case_when(site=="Ced1_COR" ~ sites_to_replace[1],
-                          site=="Ced2_COR" ~ sites_to_replace[2],
-                          site=="Ced3_COR" ~ sites_to_replace[3],
-                          site=="Cub1_COR" ~ sites_to_replace[4]))
+                          site=="Cub1_COR" ~ sites_to_replace[2],
+                          site=="Cub2_COR" ~ sites_to_replace[3],
+                          site=="Cub3_COR" ~ sites_to_replace[4]))
 
 dat_replaced <- bind_rows(dat_replace, dat_cor_replace)
 dat_ifd <- dat_replaced %>%

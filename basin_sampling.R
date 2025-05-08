@@ -116,7 +116,7 @@ for(fire in fires){
 
 ## Determine severity cutoff using threshold_sensitivity_analysis.R
 
-severity_cutoff = 25
+severity_cutoff <- 25
 for(fire in fires){
   basins_steep <- vect(here(fire, paste0(fire,"_basins_sensitivity_sbs.shp")))
   basins_final <- basins_steep %>%
@@ -140,11 +140,11 @@ for(fire in c("CedarCreek","CubCreek2")){
 cedar_basins <- vect(here("CedarCreek","CedarCreek_sample_basins_sbs_CORRECTED.shp"))
 cub_basins <- vect(here("CubCreek2","CubCreek2_sample_basins_sbs_CORRECTED.shp"))
 
-cedar_basins_sample <- cedar_basins %>% filter(severe==1) %>% slice_sample(n=3)
-cub_basins_sample <- cub_basins %>% filter(severe==1) %>% slice_sample(n=1)
+cedar_basins_sample <- cedar_basins %>% filter(severe==1) %>% slice_sample(n=1)
+cub_basins_sample <- cub_basins %>% filter(severe==1) %>% slice_sample(n=3)
 
-writeVector(cedar_basins_sample, here("CedarCreek","CedarCreek_corrected_basins.shp"))
-writeVector(cub_basins_sample, here("CubCreek2","CubCreek2_corrected_basins.shp"))
+writeVector(cedar_basins_sample, here("CedarCreek","CedarCreek_corrected_basins.shp"), overwrite=T)
+writeVector(cub_basins_sample, here("CubCreek2","CubCreek2_corrected_basins.shp"), overwrite=T)
 
 ##############
 fire <- "CedarCreek"

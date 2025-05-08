@@ -9,11 +9,11 @@ library(doParallel)
 library(scales)
 library(vip)
 
-dat <- read.csv(here("QF_results","SBS","qf_results_site.csv"))
+dat <- read.csv(here("QF_results","SBS","qf_results_site_corrected.csv"))
 # dat <- dat %>% filter(severity_class != "low")
 
 dat <- dat %>%
-  mutate(severity_class = if_else(severity_pct > 0.11, 1, 0))
+  mutate(severity_class = if_else(severity_pct > 0.25, 1, 0))
 
 set.seed(47)
 dat_split <- initial_split(dat, strata = severity_class)
@@ -100,12 +100,34 @@ final_rf <- finalize_model(
 )
 
 dat_prep <- prep(dat_rec)
-final_rf %>%
+
+var_names <- c(
+  "surface_consumption_tot_sum" = "Total Surface Consumption",
+  "surface_residence_time_mean" = "Mean Surface Residence Time",
+  "canopy_residence_time_mean" = "Mean Canopy Residence Time",
+  "canopy_consumption_tot_sum" = "Total Canopy Consumption",
+  "energy_flux_mean" = "Mean 30-s Power",
+  "surface_consumption_pct_mean" = "Mean Surface Consumption Percent",
+  "max_power_mean" = "Mean Maximum Power",
+  "canopy_consumption_pct_mean" = "Mean Canopy Consumption Percent"
+)
+
+final_fit <- final_rf %>%
   set_engine("ranger", importance = "permutation") %>%
-  fit(ss_formula,
-      data = juice(dat_prep)
-  ) %>%
-  vip(geom = "point")
+  fit(ss_formula, data = juice(dat_prep))
+
+vip_data <- vi(final_fit)
+
+ggplot(vip_data, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_segment(aes(xend = Variable, y = 0, yend = Importance)) +
+  geom_point(size = 2) +
+  scale_x_discrete(labels = var_names) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Variable") + 
+  theme(axis.title.y = element_blank())
+
+ggsave("rf_vip_regression.jpg", path = here("Plots"), width = 4.7, height = 3)
 
 final_wf <- workflow() %>%
   add_recipe(dat_rec) %>%
@@ -137,7 +159,7 @@ TClass <- factor(c("Low Risk", "Low Risk", "High Risk", "High Risk"),
                  levels = c("Low Risk","High Risk"))
 PClass <- factor(c("Low Risk", "High Risk", "Low Risk", "High Risk"),
                  levels = c("High Risk","Low Risk"))
-Y      <- c(4,9,4,9)
+Y      <- c(8,5,7,6)
 conf_df <- data.frame(TClass, PClass, Y)
 
 binom_conf <- ggplot(data = conf_df, 
