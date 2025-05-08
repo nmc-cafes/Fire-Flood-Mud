@@ -8,8 +8,10 @@ library(glmmTMB)
 library(performance)
 library(effects)
 library(rcompanion)
+library(MuMIn)
 
 ## GLMM Model Selection
+dat_site <- read.csv(here("QF_results","SBS","qf_results_site_corrected.csv"))
 
 # beta family needs to be 0 < x < 1
 dat_beta <- dat_site %>%
@@ -58,33 +60,37 @@ f30 <- severity_pct ~ canopy_residence_time_mean + max_power_mean + (1|fire)
 f31 <- severity_pct ~ surface_residence_time_mean + max_power_mean + (1|fire)
 f32 <- severity_pct ~ canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
 
-f33 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean + (1|fire)
-f34 <- severity_pct ~ canopy_consumption_pct_mean*max_power_mean + (1|fire)
-f35 <- severity_pct ~ surface_consumption_pct_mean*max_power_mean + (1|fire)
-f36 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*max_power_mean + (1|fire)
+f33 <- severity_pct ~ canopy_consumption_tot_sum + (1|fire)
+f34 <- severity_pct ~ surface_consumption_pct_mean + (1|fire)
+f35 <- severity_pct ~ canopy_consumption_tot_sum + surface_consumption_pct_mean + (1|fire)
 
-f37 <- severity_pct ~ canopy_consumption_pct_mean*canopy_residence_time_mean + (1|fire)
-f38 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean + (1|fire)
-f39 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean + (1|fire)
-f40 <- severity_pct ~ canopy_consumption_pct_mean*surface_residence_time_mean + (1|fire)
-f41 <- severity_pct ~ surface_consumption_pct_mean*surface_residence_time_mean + (1|fire)
-f42 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*surface_residence_time_mean + (1|fire)
-f43 <- severity_pct ~ canopy_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean + (1|fire)
-f44 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean + (1|fire)
-f45 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean + (1|fire)
+f36 <- severity_pct ~ canopy_consumption_tot_sum + max_power_mean + (1|fire)
+f37 <- severity_pct ~ surface_consumption_pct_mean + max_power_mean + (1|fire)
+f38 <- severity_pct ~ canopy_consumption_tot_sum + surface_consumption_pct_mean + max_power_mean + (1|fire)
 
-f46 <- severity_pct ~ canopy_consumption_pct_mean*canopy_residence_time_mean*max_power_mean + (1|fire)
-f47 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean*max_power_mean + (1|fire)
-f48 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean*max_power_mean + (1|fire)
-f49 <- severity_pct ~ canopy_consumption_pct_mean*surface_residence_time_mean*max_power_mean + (1|fire)
-f50 <- severity_pct ~ surface_consumption_pct_mean*surface_residence_time_mean*max_power_mean + (1|fire)
-f51 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*surface_residence_time_mean*max_power_mean + (1|fire)
-f52 <- severity_pct ~ canopy_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean*max_power_mean + (1|fire)
-f53 <- severity_pct ~ surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean*max_power_mean + (1|fire)
-f54 <- severity_pct ~ canopy_consumption_pct_mean*surface_consumption_pct_mean*canopy_residence_time_mean*surface_residence_time_mean*max_power_mean + (1|fire)
+f39 <- severity_pct ~ canopy_consumption_tot_sum + canopy_residence_time_mean + (1|fire)
+f40 <- severity_pct ~ surface_consumption_pct_mean + canopy_residence_time_mean + (1|fire)
+f41 <- severity_pct ~ canopy_consumption_tot_sum + surface_consumption_pct_mean + canopy_residence_time_mean + (1|fire)
+f42 <- severity_pct ~ canopy_consumption_tot_sum + surface_residence_time_mean + (1|fire)
+f43 <- severity_pct ~ surface_consumption_pct_mean + surface_residence_time_mean + (1|fire)
+f44 <- severity_pct ~ canopy_consumption_tot_sum + surface_consumption_pct_mean + surface_residence_time_mean + (1|fire)
+f45 <- severity_pct ~ canopy_consumption_tot_sum + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+f46 <- severity_pct ~ surface_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+f47 <- severity_pct ~ canopy_consumption_tot_sum + surface_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+
+f48 <- severity_pct ~ canopy_consumption_tot_sum + canopy_residence_time_mean + max_power_mean + (1|fire)
+f49 <- severity_pct ~ surface_consumption_pct_mean + canopy_residence_time_mean + max_power_mean + (1|fire)
+f50 <- severity_pct ~ canopy_consumption_tot_sum + surface_consumption_pct_mean + canopy_residence_time_mean + max_power_mean + (1|fire)
+f51 <- severity_pct ~ canopy_consumption_tot_sum + surface_residence_time_mean + max_power_mean + (1|fire)
+f52 <- severity_pct ~ surface_consumption_pct_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f53 <- severity_pct ~ canopy_consumption_tot_sum + surface_consumption_pct_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f54 <- severity_pct ~ canopy_consumption_tot_sum + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f55 <- severity_pct ~ surface_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f56 <- severity_pct ~ canopy_consumption_tot_sum + surface_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
 
 formulae <- c(f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,
-              f21,f22,f23,f24,f26,f27,f28,f29,f30,f31,f32)
+              f21,f22,f23,f24,f26,f27,f28,f29,f30,f31,f32,f33,f34,f35,f36,f37,f38,f39,f40,
+              f41,f42,f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f53,f54,f55,f56)
 aic_df <- tibble("model" = seq(1,length(formulae)), "AICc" = rep(NA, length(formulae)))
 for(j in 1:length(formulae)){
   print(j)
@@ -98,6 +104,7 @@ for(j in 1:length(formulae)){
 
 ggplot(aic_df, aes(model,AICc)) + geom_point()
 selected <- paste0("f",aic_df[which.min(aic_df$AICc),"model"])
+get(selected)
 final_model <- glmmTMB(get(selected), 
                        family=beta_family(link="logit"), 
                        data = dat_beta,
@@ -106,30 +113,20 @@ mod_sim <- simulateResiduals(final_model)
 plot(mod_sim)
 print(summary(final_model))
 print(r.squaredGLMM(final_model))
+rmse_final <- sqrt(mean(residuals(final_model)^2))
+rmse_final
 check_singularity(final_model)
 check_collinearity(final_model)
 
-# see if it's different/not singular without a random effect
-final_model_fixed <- glmmTMB(severity_pct ~ canopy_consumption_pct_mean + canopy_residence_time_mean + surface_residence_time_mean,
-                             family=beta_family(link="logit"), 
-                             data = dat_beta)
-mod_sim_fixed <- simulateResiduals(final_model_fixed)
-plot(mod_sim_fixed)
-print(summary(final_model_fixed))
 
-Actual    = dat_beta$severity_pct
-Predicted = predict(final_model_fixed, type="response")
-Residuals = residuals(final_model_fixed)
-efronRSquared(residual = Residuals, 
-              predicted = Predicted, 
-              statistic = "EfronRSquared")
-rmse_final <- sqrt(mean(residuals(final_model_fixed)^2))
+beta_actual    = dat_beta$severity_pct
+beta_predicted = predict(final_model, type="response")
+beta_residuals = residuals(final_model)
+# efronRSquared(residual = Residuals, 
+#               predicted = Predicted, 
+#               statistic = "EfronRSquared")
 
-# rmse(final_model_fixed)
-check_singularity(final_model_fixed)
-check_collinearity(final_model_fixed)
-
-beta_resid <- ggplot(mapping=aes(Actual,Predicted)) +
+beta_resid <- ggplot(mapping=aes(beta_actual,beta_predicted)) +
   geom_abline(slope=1, intercept=c(0,0), color="red",linetype="dashed") +
   geom_point(shape=1) +
   coord_equal() +
@@ -138,15 +135,16 @@ beta_resid <- ggplot(mapping=aes(Actual,Predicted)) +
   labs(x="Observed Severe-Steep Percent",
        y="Predicted Severe-Steep Percent") +
   theme_bw()
+beta_resid
 
-ggsave(beta_resid, "beta_glmm_resid.jpg",path = here("Plots"), height = 3, width = 3)
+ggsave("beta_glmm_resid.jpg", plot = beta_resid, path = here("Plots"), height = 3, width = 3)
 
 # effects plots
-ccp_effects <- effect(term = "canopy_consumption_pct_mean", mod = final_model_fixed, xlevels = 100)
+ccp_effects <- effect(term = "canopy_consumption_pct_mean", mod = final_model, xlevels = 100)
 ccp_effects <- as.data.frame(ccp_effects)
-crt_effects <- effect(term = "canopy_residence_time_mean", mod = final_model_fixed, xlevels = 100)
+crt_effects <- effect(term = "canopy_residence_time_mean", mod = final_model, xlevels = 100)
 crt_effects <- as.data.frame(crt_effects)
-srt_effects <- effect(term = "surface_residence_time_mean", mod = final_model_fixed, xlevels = 100)
+srt_effects <- effect(term = "surface_residence_time_mean", mod = final_model, xlevels = 100)
 srt_effects <- as.data.frame(srt_effects)
 
 ccp <- ggplot() +
@@ -167,7 +165,7 @@ ccp <- ggplot() +
            sides = "b") +
   scale_color_colorblind() +
   theme_bw()
-# ccp
+ccp
 
 crt <- ggplot() +
   geom_line(data = crt_effects, 
@@ -186,7 +184,7 @@ crt <- ggplot() +
            sides = "b") +
   scale_color_colorblind() +
   theme_bw()
-# crt
+crt
 
 srt <- ggplot() +
   geom_line(data = srt_effects, 
@@ -205,10 +203,11 @@ srt <- ggplot() +
            sides = "b") +
   scale_color_colorblind() +
   theme_bw()
-# srt
+srt
+
 
 beta_effects <- ccp + crt + srt + plot_layout(guides = "collect", axes = "collect")
-ggsave(glmm_effects, "glmm_effects.jpg", path=here("Plots"), height = 3, width = 9)
+ggsave("glmm_effects.jpg", plot=beta_effects, path=here("Plots"), height = 3, width = 6)
 
 ###########
 # GLMM with binomial family
@@ -254,8 +253,37 @@ f30 <- high_risk ~ canopy_residence_time_mean + max_power_mean + (1|fire)
 f31 <- high_risk ~ surface_residence_time_mean + max_power_mean + (1|fire)
 f32 <- high_risk ~ canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
 
+f33 <- high_risk ~ canopy_consumption_tot_sum + (1|fire)
+f34 <- high_risk ~ surface_consumption_tot_sum + (1|fire)
+f35 <- high_risk ~ canopy_consumption_tot_sum + surface_consumption_tot_sum + (1|fire)
+
+f36 <- high_risk ~ canopy_consumption_tot_sum + max_power_mean + (1|fire)
+f37 <- high_risk ~ surface_consumption_tot_sum + max_power_mean + (1|fire)
+f38 <- high_risk ~ canopy_consumption_tot_sum + surface_consumption_tot_sum + max_power_mean + (1|fire)
+
+f39 <- high_risk ~ canopy_consumption_tot_sum + canopy_residence_time_mean + (1|fire)
+f40 <- high_risk ~ surface_consumption_tot_sum + canopy_residence_time_mean + (1|fire)
+f41 <- high_risk ~ canopy_consumption_tot_sum + surface_consumption_tot_sum + canopy_residence_time_mean + (1|fire)
+f42 <- high_risk ~ canopy_consumption_tot_sum + surface_residence_time_mean + (1|fire)
+f43 <- high_risk ~ surface_consumption_tot_sum + surface_residence_time_mean + (1|fire)
+f44 <- high_risk ~ canopy_consumption_tot_sum + surface_consumption_tot_sum + surface_residence_time_mean + (1|fire)
+f45 <- high_risk ~ canopy_consumption_tot_sum + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+f46 <- high_risk ~ surface_consumption_tot_sum + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+f47 <- high_risk ~ canopy_consumption_tot_sum + surface_consumption_tot_sum + canopy_residence_time_mean + surface_residence_time_mean + (1|fire)
+
+f48 <- high_risk ~ canopy_consumption_tot_sum + canopy_residence_time_mean + max_power_mean + (1|fire)
+f49 <- high_risk ~ surface_consumption_tot_sum + canopy_residence_time_mean + max_power_mean + (1|fire)
+f50 <- high_risk ~ canopy_consumption_tot_sum + surface_consumption_tot_sum + canopy_residence_time_mean + max_power_mean + (1|fire)
+f51 <- high_risk ~ canopy_consumption_tot_sum + surface_residence_time_mean + max_power_mean + (1|fire)
+f52 <- high_risk ~ surface_consumption_tot_sum + surface_residence_time_mean + max_power_mean + (1|fire)
+f53 <- high_risk ~ canopy_consumption_tot_sum + surface_consumption_tot_sum + surface_residence_time_mean + max_power_mean + (1|fire)
+f54 <- high_risk ~ canopy_consumption_tot_sum + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f55 <- high_risk ~ surface_consumption_tot_sum + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+f56 <- high_risk ~ canopy_consumption_tot_sum + surface_consumption_tot_sum + canopy_residence_time_mean + surface_residence_time_mean + max_power_mean + (1|fire)
+
 formulae <- c(f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20,
-              f21,f22,f23,f24,f26,f27,f28,f29,f30,f31,f32)
+              f21,f22,f23,f24,f26,f27,f28,f29,f30,f31,f32,f33,f34,f35,f36,f37,f38,f39,f40,
+              f41,f42,f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f53,f54,f55,f56)
 aic_df <- tibble("model" = seq(1,length(formulae)), "AICc" = rep(NA, length(formulae)))
 for(j in 1:length(formulae)){
   print(j)
@@ -269,6 +297,7 @@ for(j in 1:length(formulae)){
 
 ggplot(aic_df, aes(model,AICc)) + geom_point()
 selected <- paste0("f",aic_df[which.min(aic_df$AICc),"model"])
+get(selected)
 final_model <- glmmTMB(get(selected), 
                        family=binomial(link = "logit"), 
                        data = dat_binom,
@@ -296,11 +325,11 @@ binomial_effects <- dat_binom %>%
   theme_bw() +
   theme(legend.position = "none")
 
-ggsave(binomial_effects, "binomial_effects.jpg", path = here("Plots"), width = 4, height = 3)
+ggsave( "binomial_effects.jpg", plot=binomial_effects, path = here("Plots"), width = 4, height = 3)
 
 library(yardstick)
-Actual <- factor(dat_binom$high_risk, levels = c(0,1))
-Predicted <- factor(round(predict(final_model, type="response")), levels = c(0,1))
+Actual <- factor(dat_binom$high_risk)
+Predicted <- factor(round(predict(final_model, type="response")))
 Predicted_prob <- predict(final_model, type="response")
 confusion <- tibble(actual = Actual, predicted = Predicted)
 confusion_matrix <- conf_mat(confusion, truth="actual", estimate="predicted")
@@ -312,7 +341,7 @@ TClass <- factor(c("Low Risk", "Low Risk", "High Risk", "High Risk"),
                  levels = c("Low Risk","High Risk"))
 PClass <- factor(c("Low Risk", "High Risk", "Low Risk", "High Risk"),
                  levels = c("High Risk","Low Risk"))
-Y      <- c(31, 21, 23, 25)
+Y      <- c(23, 27, 15, 35)
 conf_df <- data.frame(TClass, PClass, Y)
 
 binom_conf <- ggplot(data = conf_df, 
