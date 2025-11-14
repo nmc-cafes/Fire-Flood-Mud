@@ -151,7 +151,7 @@ reg_res <- final_res %>%
   theme_bw() +
   theme(aspect.ratio = 1)
 
-ggsave("rf_fes_ss.jpg",path = here("Plots"), height = 3, width = 3)
+ggsave("rf_res_ss.jpg",path = here("Plots"), height = 3, width = 3)
 
 
 # Results from rf_modeling_classification
@@ -178,6 +178,8 @@ binom_conf <- ggplot(data = conf_df,
         axis.ticks=element_blank(),
         axis.text.y = element_text(angle=90, hjust = 0.5))
 
-free(reg_res) + free(binom_conf)
-ggsave("rf_results.jpg", path=here("Plots"), height = 3, width=6)
+free(reg_res) + 
+  free(dnbr_res) + # FROM rf_modeling_regression_dNBR.R!!!
+  free(binom_conf)
+ggsave("rf_results.jpg", path=here("Plots"), height = 3, width=9)
 
