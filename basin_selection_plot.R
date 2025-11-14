@@ -33,7 +33,7 @@ crop_severity <- function(rst, x_min, y_min, x_max, y_max){
 
 perimeter <- vect(here("KNP","KNP_perimeter.shp"))
 drainage <- vect(here("KNP","KNP_drainage_prox_200.shp"))
-sites <- vect(here("KNP","KNP_sample_basins.shp"))
+sites <- vect(here("KNP","KNP_sample_basins_sbs.shp"))
 slope <- slope_mask("KNP")
 slope_vect <- as.polygons(slope)
 severity <- rast(here("KNP", "KNP_SBS.tif"))
