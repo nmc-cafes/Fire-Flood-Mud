@@ -147,8 +147,8 @@ writeVector(cedar_basins_sample, here("CedarCreek","CedarCreek_corrected_basins.
 writeVector(cub_basins_sample, here("CubCreek2","CubCreek2_corrected_basins.shp"), overwrite=T)
 
 ##############
-fire <- "CedarCreek"
-basins_sampled <- vect(here(fire,paste0(fire,"_corrected_basins.shp")))
+fire <- "CubCreek2"
+basins_sampled <- vect(here(fire,paste0(fire,"_sample_basins_sbs.shp")))
 
 ggplot() +
   geom_spatvector(data=basins_sampled, aes(fill = severe)) +
