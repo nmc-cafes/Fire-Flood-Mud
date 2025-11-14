@@ -48,14 +48,15 @@ fires <- c("Caldor","CedarCreek","CubCreek2","Dixie","KNP")
 sizes <- c("duet")
 outputs <- c("mass_burnt_pct",
              "surface_consumption",
-             "surface_remaining",
+             "surface_consumption_pct",
+             "surface_remaining_pct",
              "canopy_consumption",
              "canopy_remaining",
              "max_power",
              "residence_time_power",
              "residence_time_consumption",
              "max_reaction_rate")
-
+site_df <- read.csv(here("Sample_Sites_NEW2.csv"))
 
 first_fire <- T
 rm(out_vect,size_vect,site_vect,fire_vect)
@@ -76,13 +77,14 @@ for(fire in fires){
   first_site <- T
   for(site in sites){
     cat(site,"\n")
+    severity_class <- site_df %>% filter(Site_Name==site) %>% pull(Severity_Class)
+    homogeneity_class <- site_df %>% filter(Site_Name==site) %>% pull(Homogeneity_Class)
     first_size <- T
     for(size in sizes){
       cat(size,"\n")
       plot_bounds <- vect(here(fire,
                                "Sample_Sites",
                                site,
-                               paste0("500m"),
                                paste0(site,"_bounds_500m.shp")))
       mtbs_crop <- crop(mtbs, ext(plot_bounds))
       mtbs_pts <- as.points(mtbs_crop)
@@ -93,7 +95,7 @@ for(fire in fires){
       first_output <- T
       for(output in outputs){
         cat("\t",output,"\n")
-        out_arr <- read.table(here("Duet_Arrays",
+        out_arr <- read.table(here("Arrays",
                                    fire, 
                                    paste0(fire,"_",site,"_",size),
                                    "Arrays",
@@ -118,9 +120,10 @@ for(fire in fires){
         }
         first_output <- F
       }
-      out_vect$size <- size
       out_vect$site <- site
       out_vect$fire <- fire
+      out_vect$severity_class <- severity_class
+      out_vect$homogeneity_class <- homogeneity_class
       if(first_size){
         size_vect <- out_vect
       } else{
@@ -144,4 +147,4 @@ for(fire in fires){
 }
 
 all_data <- as_tibble(fire_vect)
-write.csv(all_data, here("all_data_duet.csv"), row.names = F)
+write.csv(all_data, here("all_data_expandedsampling.csv"), row.names = F)

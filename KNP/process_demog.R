@@ -23,3 +23,8 @@ write_sf(CCR_sf, "CCRPIPO_trees.shp")
 # get bounding box
 CCR_bbox <- st_as_sfc(st_bbox(CCR_sf))
 write_sf(CCR_bbox, "CCRPIPO_bounds.shp")
+
+
+#
+demog_sf <- st_as_sf(demog, coords = c("XCoord","YCoord"), crs = 26911)
+write_sf(demog_sf, "all_demog_trees.shp")

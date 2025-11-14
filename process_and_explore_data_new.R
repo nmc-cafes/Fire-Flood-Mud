@@ -1,0 +1,357 @@
+library(here)
+library(tidyverse)
+library(skimr)
+library(ggthemes)
+library(GGally)
+library(scales)
+library(betareg)
+
+# Function to add colors to ggpairs plot based on Pearson coefficient
+corr_upper <- function(data, mapping, method="p", use="pairwise", ...){
+  
+  # grab data
+  x <- eval_data_col(data, mapping$x)
+  y <- eval_data_col(data, mapping$y)
+  
+  # calculate correlation
+  corr <- cor(x, y, method=method, use=use)
+  
+  # calculate color based on correlation value
+  # Here I have set a correlation of minus one to blue, 
+  # zero to white, and one to red 
+  # Change this to suit: possibly extend to add as an argument of `my_fn`
+  colFn <- colorRampPalette(c("blue", "white", "red"), interpolate ='spline')
+  fill <- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
+  
+  ggally_cor(data = data, mapping = mapping, color="black", ...) + 
+    theme_void() +
+    theme(panel.background = element_rect(fill=fill))
+}
+
+corr_lower <- function(data, mapping){
+  ggally_points(data = data, mapping = mapping, shape = 1, alpha = 0.5) +
+    scale_y_continuous(n.breaks = 3) +
+    theme_bw()
+}
+
+# Read in data
+dat_raw <- read_csv(here("QF_results","SBS","qf_results.csv"))
+dat_cor_raw <- read_csv(here("QF_results","SBS","qf_results_corrected.csv"))
+# skim_without_charts(dat_raw)
+
+# Choose three low-severity sites at random to replace with corrected simulations
+set.seed(987654321)
+cub_lowseverity <- dat_raw %>%
+  group_by(site, fire) %>%
+  summarize(severity_pct = sum(severity %in% c(3,4) & steep==1) / sum(severity > 0)) %>%
+  filter(fire=="CubCreek2",
+         severity_pct <= 0.25) %>%
+  pull(site)
+cub_random <- sample(cub_lowseverity, 3)
+
+# Replace those sites in the dataset
+sites_to_replace <- c("Ced14", cub_random)
+dat_replace <- dat_raw %>%
+  filter(!site %in% sites_to_replace)
+dat_cor_replace <- dat_cor_raw %>%
+  mutate(site = case_when(site=="Ced1_COR" ~ sites_to_replace[1],
+                          site=="Cub1_COR" ~ sites_to_replace[2],
+                          site=="Cub2_COR" ~ sites_to_replace[3],
+                          site=="Cub3_COR" ~ sites_to_replace[4]))
+dat_replaced <- bind_rows(dat_replace, dat_cor_replace)
+
+# Calculate initial fuel densities
+dat_ifd <- dat_replaced %>%
+  mutate(canopy_rhof_init = canopy_consumption_tot/canopy_consumption_pct,
+         surface_rhof_init = surface_consumption_tot/surface_consumption_pct) %>%
+  mutate(total_rhof_init = canopy_rhof_init + surface_rhof_init)
+
+# Summarize QUIC-Fire results by sample basin
+dat_site <- dat_ifd %>%
+  group_by(site, fire) %>%
+  summarize(severity_pct = sum(severity %in% c(3,4) & steep==1) / sum(severity > 0),
+            dNBR_mean = mean(dNBR),
+            canopy_consumption_pct_mean = mean(canopy_consumption_pct)*100,
+            canopy_consumption_tot_sum = sum(canopy_consumption_tot),
+            canopy_residence_time_mean = mean(canopy_residence_time),
+            energy_flux_mean = mean(energy_flux),
+            mass_burnt_pct_mean = mean(mass_burnt_pct),
+            max_power_mean = mean(max_power),
+            surface_consumption_pct_mean = mean(surface_consumption_pct)*100,
+            surface_consumption_tot_sum = sum(surface_consumption_tot),
+            surface_residence_time_mean = mean(surface_residence_time),
+            total_power_sum = sum(total_power),
+            canopy_rhof_init_sum = sum(canopy_rhof_init, na.rm=T),
+            surface_rhof_init_sum = sum(surface_rhof_init, na.rm=T),
+            total_rhof_init_sum = sum(total_rhof_init, na.rm=T)) %>%
+  mutate(canopy_residence_time_mean = canopy_residence_time_mean/60, #canopy res time to min
+         canopy_consumption_tot_sum = canopy_consumption_tot_sum/1000, #kilograms to megagrams
+         surface_consumption_tot_sum = surface_consumption_tot_sum/1000,
+         total_power_sum = total_power_sum/1000000)
+
+# Write to file
+write.csv(dat_site, here("QF_results","SBS","qf_results_site_corrected.csv"), row.names = F)
+dat_site <- read_csv(here("QF_results","SBS","qf_results_site_corrected.csv"))
+
+#########
+## Create correlation plot for all QF outputs
+dat_site_pairs <- dat_site
+names(dat_site_pairs)[3:14] <- c("Percent Burned at\nModerate to High Severity\non Steep Slopes",
+                                 "Average dNBR",
+                                 "Total Canopy\nConsumption (%)",
+                                 "Total Canopy\nConsumption (Mg/m3)",
+                                 "Average Canopy\nResidence Time (min)",
+                                 "Average Power (kW)",
+                                 "Total Consumption (%)",
+                                 "Average Max\nPower (kW/m3)",
+                                 "Total Surface\nConsumption (%)",
+                                 "Total Surface\nConsumption (Mg/m3)",
+                                 "Average Surface\nResidence Time (s)",
+                                 "Total Energy (GW)"
+                                 )
+# first with steep-severe percent
+corr_plot_ss <- ggpairs(dat_site_pairs, 
+        columns = c(3,5:14), 
+        upper = list(continuous = corr_upper),
+        lower = list(continuous = corr_lower)) +
+  theme(strip.text.y = element_text(angle=0),
+        strip.text.x = element_text(angle=90),
+        axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
+# then with dNBR
+corr_plot_dnbr <- ggpairs(dat_site_pairs, 
+                        columns = c(4:14), 
+                        upper = list(continuous = corr_upper),
+                        lower = list(continuous = corr_lower)) +
+  theme(strip.text.y = element_text(angle=0),
+        strip.text.x = element_text(angle=90),
+        axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
+
+ggsave("correlation_matrix_responses.png", plot = corr_plot_ss, path = here("Plots"), width = 9, height=7.5)
+
+# just the response variables
+corr_ss_dnbr <- ggpairs(dat_site_pairs[3:4])
+ggsave("correlation_ss_dnbr.png", plot = corr_ss_dnbr, path = here("Plots"), width=5, height= 5)
+
+# both response variables and all predictors
+corr_plot_both <- ggpairs(dat_site_pairs, 
+                          columns = c(3:13), 
+                          upper = list(continuous = corr_upper),
+                          lower = list(continuous = corr_lower)) +
+  theme(strip.text.y = element_text(angle=0),
+        strip.text.x = element_text(angle=90),
+        axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
+ggsave("correlation_matrix_responses_predictors.png", 
+       plot = corr_plot_both, path = here("Plots"), width = 10, height=7.75)
+
+########
+dat_long <- dat_site %>%
+  pivot_longer(cols = 5:14,
+               values_to = "val",
+               names_to = "var") %>%
+  mutate(var = factor(var, 
+                      levels = c("surface_consumption_tot_sum",
+                                 "surface_consumption_pct_mean",
+                                 "canopy_consumption_tot_sum",
+                                 "canopy_consumption_pct_mean",
+                                 "mass_burnt_pct_mean",
+                                 "surface_residence_time_mean",
+                                 "canopy_residence_time_mean",
+                                 "max_power_mean",
+                                 "total_power_sum",
+                                 "energy_flux_mean"),
+                      labels = c("Total Surface\nConsumption (Mg/m3)",
+                                 "Total Surface\nConsumption (%)",
+                                 "Total Canopy\nConsumption (Mg/m3)",
+                                 "Total Canopy\nConsumption (%)",
+                                 "Total Consumption (%)",
+                                 "Average Surface\nResidence Time (s)",
+                                 "Average Canopy\nResidence Time (min)",
+                                 "Average Max\nPower (kW/m3)",
+                                 "Total Power (kW)",
+                                 "Average Power (kW)")))
+
+## Bar charts
+mburnt_site <- dat_site %>%
+  ggplot() +
+  geom_bar(stat = "identity", aes(site,mass_burnt_pct_mean,fill=fire)) +
+  facet_wrap(.~fire, scales = "free_y") +
+  scale_fill_colorblind()+
+  labs(x="",
+       y="Mass Burnt (%)") +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "none")
+mburnt_site
+
+canopy_cons_site <- dat_site %>%
+  ggplot() +
+  geom_bar(stat = "identity", aes(site,canopy_consumption_pct_mean,fill=fire)) +
+  facet_wrap(.~fire, scales = "free_y") +
+  scale_fill_colorblind()+
+  labs(x="",
+       y="Canopy Consumption (%)") +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "none")
+canopy_cons_site
+
+
+## Scatterplots
+dat_beta <- dat_site %>%
+  mutate(severity_pct = case_when(severity_pct==0 ~ 0.001,
+                                  severity_pct==1 ~ 0.999,
+                                  TRUE ~ severity_pct))
+# TODO: Do beta regressions for all predictors, predict, append to data, plot.
+betapred_list <- list()
+j <- 1
+for(col in 5:14){
+  pred <- names(dat_beta)[col]
+  formula <- as.formula(paste("severity_pct ~", pred))
+  betamod <- betareg(formula, data=dat_beta, link="logit")
+  betapred <- tibble(pred = seq(0,max(dat_beta[pred]),(max(dat_beta[pred])/500)))
+  names(betapred) <- pred
+  betapred$pred <- predict(betamod, betapred, type="response")
+  names(betapred) <- c(paste0(pred,".val"), paste0(pred,".severity_pct"))
+  betapred_list[[j]] <- betapred
+  j <- j + 1
+}
+beta_pred <- bind_cols(betapred_list) %>%
+  pivot_longer(cols = everything(),
+               names_to = c("var", ".value"),
+               names_sep = "\\.") %>%
+  mutate(var = factor(var, 
+                      levels = c("surface_consumption_tot_sum",
+                                 "surface_consumption_pct_mean",
+                                 "canopy_consumption_tot_sum",
+                                 "canopy_consumption_pct_mean",
+                                 "mass_burnt_pct_mean",
+                                 "surface_residence_time_mean",
+                                 "canopy_residence_time_mean",
+                                 "max_power_mean",
+                                 "total_power_sum",
+                                 "energy_flux_mean"),
+                      labels = c("Total Surface\nConsumption (Mg/m3)",
+                                 "Total Surface\nConsumption (%)",
+                                 "Total Canopy\nConsumption (Mg/m3)",
+                                 "Total Canopy\nConsumption (%)",
+                                 "Total Consumption (%)",
+                                 "Average Surface\nResidence Time (s)",
+                                 "Average Canopy\nResidence Time (min)",
+                                 "Average Max\nPower (kW/m3)",
+                                 "Total Power (kW)",
+                                 "Average Power (kW)")))
+
+dat_long <- dat_long %>%
+  filter(var != "Total Power (kW)")
+beta_pred <- beta_pred %>%
+  filter(var != "Total Power (kW)")
+
+ss_scatter <- ggplot(mapping = aes(val,severity_pct)) +
+  geom_point(data = dat_long, aes(color=fire)) +
+  geom_line(data = beta_pred) +
+  # geom_smooth(data = dat_long, method = "lm", color = "blue") +
+  facet_wrap(.~var, scales="free_x", nrow = 2) +
+  scale_color_colorblind() +
+  scale_y_continuous(labels = percent_format()) +
+  labs(x="",
+       y="Percent Burned at\nModerate to High Severity on Steep Slopes",
+       color = "Focal Fire") +
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.9, 0.2))
+ss_scatter
+ggsave("severe_steep_scatters.jpg",ss_scatter,path=here("Plots"),width=10, height=4)
+
+dnbr_scatter <- dat_long %>%
+  filter(var != "Total Power (kW)") %>%
+  ggplot() +
+  geom_point(aes(val,dNBR_mean,color=fire)) +
+  geom_smooth(aes(val,dNBR_mean), method="lm", color = "black") +
+  facet_wrap(.~var, scales="free_x", nrow = 2) +
+  scale_color_colorblind() +
+  labs(x="",
+       y="Average dNBR",
+       color = "Focal Fire") +
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.9, 0.2))
+dnbr_scatter
+ggsave("dNBR_scatters.png",dnbr_scatter,path=here("Plots"),width=10, height=4)
+
+## severity class boxplots
+mtbs_colors <-c("#006400","#7fffd4","#ffff00","#ff0000","#7fff00")
+
+massburnt_boxplot <- dat_raw %>%
+  filter(mass_burnt_pct > 0,
+         severity %in% c(1,2,3,4)) %>%
+  mutate(severity = factor(severity, labels = c("Unburned",
+                                                "Low Severity",
+                                                "Moderate Severity",
+                                                "High Severity"))) %>%
+  ggplot() +
+  geom_boxplot(aes(fire,mass_burnt_pct,fill=severity), outlier.shape = 1, outlier.alpha = 0.25) +
+  scale_fill_manual(values = mtbs_colors) +
+  labs(x="Focal Fire",
+       y="Mass Burnt (%)",
+       fill = "Severity") +
+  theme_bw()
+massburnt_boxplot
+
+srt_boxplot <- dat_raw %>%
+  filter(surface_residence_time > 0,
+         severity %in% c(1,2,3,4)) %>%
+  mutate(severity = factor(severity, labels = c("Unburned",
+                                                "Low Severity",
+                                                "Moderate Severity",
+                                                "High Severity"))) %>%
+  ggplot() +
+  geom_boxplot(aes(fire,surface_residence_time,fill=severity), outlier.shape = 1, outlier.alpha = 0.05) +
+  scale_fill_manual(values = mtbs_colors) +
+  labs(x="Focal Fire",
+       y="Surface Residence Time (s)",
+       fill = "Severity") +
+  theme_bw()
+srt_boxplot
+
+flux_boxplot <- dat_raw %>%
+  filter(energy_flux > 0,
+         severity %in% c(1,2,3,4)) %>%
+  mutate(severity = factor(severity, labels = c("Unburned",
+                                                "Low Severity",
+                                                "Moderate Severity",
+                                                "High Severity"))) %>%
+  ggplot() +
+  geom_boxplot(aes(fire,energy_flux,fill=severity), outlier.shape = 1, outlier.alpha = 0.05) +
+  scale_fill_manual(values = mtbs_colors) +
+  labs(x="Focal Fire",
+       y="Energy Flux (W)",
+       fill = "Severity") +
+  theme_bw()
+flux_boxplot
+
+canopy_pct_boxplot <- dat_raw %>%
+  filter(canopy_consumption_pct > 0,
+         severity %in% c(1,2,3,4)) %>%
+  mutate(severity = factor(severity, labels = c("Unburned",
+                                                "Low Severity",
+                                                "Moderate Severity",
+                                                "High Severity"))) %>%
+  ggplot() +
+  geom_boxplot(aes(fire,canopy_consumption_pct,fill=severity), outlier.shape = 1, outlier.alpha = 0.05) +
+  scale_fill_manual(values = mtbs_colors) +
+  labs(x="Focal Fire",
+       y="Canopy Consumption (%)",
+       fill = "Severity") +
+  theme_bw()
+canopy_pct_boxplot
+
+
+########
+
+dat_site %>%
+  ggplot() +
+  geom_point(aes(surface_rhof_init_sum, severity_pct, color = fire)) +
+  geom_smooth(aes(surface_rhof_init_sum, severity_pct), method = "lm") +
+  theme_bw()
+  
+
