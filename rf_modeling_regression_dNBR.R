@@ -7,11 +7,11 @@ library(tidyverse)
 library(tidymodels)
 library(doParallel)
 
-dat <- read.csv(here("QF_results","qf_results_site.csv"))
+dat <- read.csv(here("QF_results","SBS","qf_results_site_corrected.csv"))
 # dat <- dat %>% filter(severity_class != "low")
 
 dat <- dat %>%
-  mutate(severity_class = if_else(severity_pct > 0.3, 1, 0))
+  mutate(severity_class = if_else(severity_pct > 0.25, 1, 0))
 
 set.seed(47)
 dat_split <- initial_split(dat, strata = severity_class)
@@ -70,7 +70,7 @@ tune_res %>%
 
 rf_grid <- grid_regular(
   mtry(range = c(1, 4)),
-  min_n(range = c(20, 40)),
+  min_n(range = c(1, 10)),
   levels = 5
 )
 
@@ -90,7 +90,7 @@ regular_res %>%
   geom_point() +
   labs(y = "RMSE")
 
-best_rmse <- select_best(regular_res, "rmse")
+best_rmse <- select_best(regular_res, metric="rmse")
 
 final_rf <- finalize_model(
   tune_spec,
@@ -117,7 +117,7 @@ final_res <- final_wf %>%
 final_res %>%
   collect_metrics()
 
-final_res %>%
+dnbr_res <- final_res %>%
   collect_predictions() %>%
   ggplot() +
   geom_point(aes(dNBR_mean,.pred), shape=1, alpha=0.5) +
@@ -128,5 +128,5 @@ final_res %>%
        y="Predicted dNBR") +
   theme_bw() +
   theme(aspect.ratio = 1)
-  
+ggsave("rf_res_dnbr.jpg",path = here("Plots"), height = 3, width = 3)  
   
