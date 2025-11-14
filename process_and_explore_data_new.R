@@ -6,6 +6,7 @@ library(GGally)
 library(scales)
 library(betareg)
 
+# Function to add colors to ggpairs plot based on Pearson coefficient
 corr_upper <- function(data, mapping, method="p", use="pairwise", ...){
   
   # grab data
@@ -15,7 +16,7 @@ corr_upper <- function(data, mapping, method="p", use="pairwise", ...){
   # calculate correlation
   corr <- cor(x, y, method=method, use=use)
   
-  # calculate colour based on correlation value
+  # calculate color based on correlation value
   # Here I have set a correlation of minus one to blue, 
   # zero to white, and one to red 
   # Change this to suit: possibly extend to add as an argument of `my_fn`
@@ -33,10 +34,12 @@ corr_lower <- function(data, mapping){
     theme_bw()
 }
 
+# Read in data
 dat_raw <- read_csv(here("QF_results","SBS","qf_results.csv"))
 dat_cor_raw <- read_csv(here("QF_results","SBS","qf_results_corrected.csv"))
 # skim_without_charts(dat_raw)
 
+# Choose three low-severity sites at random to replace with corrected simulations
 set.seed(987654321)
 cub_lowseverity <- dat_raw %>%
   group_by(site, fire) %>%
@@ -45,8 +48,9 @@ cub_lowseverity <- dat_raw %>%
          severity_pct <= 0.25) %>%
   pull(site)
 cub_random <- sample(cub_lowseverity, 3)
-sites_to_replace <- c("Ced14", cub_random)
 
+# Replace those sites in the dataset
+sites_to_replace <- c("Ced14", cub_random)
 dat_replace <- dat_raw %>%
   filter(!site %in% sites_to_replace)
 dat_cor_replace <- dat_cor_raw %>%
@@ -54,13 +58,15 @@ dat_cor_replace <- dat_cor_raw %>%
                           site=="Cub1_COR" ~ sites_to_replace[2],
                           site=="Cub2_COR" ~ sites_to_replace[3],
                           site=="Cub3_COR" ~ sites_to_replace[4]))
-
 dat_replaced <- bind_rows(dat_replace, dat_cor_replace)
+
+# Calculate initial fuel densities
 dat_ifd <- dat_replaced %>%
   mutate(canopy_rhof_init = canopy_consumption_tot/canopy_consumption_pct,
          surface_rhof_init = surface_consumption_tot/surface_consumption_pct) %>%
   mutate(total_rhof_init = canopy_rhof_init + surface_rhof_init)
 
+# Summarize QUIC-Fire results by sample basin
 dat_site <- dat_ifd %>%
   group_by(site, fire) %>%
   summarize(severity_pct = sum(severity %in% c(3,4) & steep==1) / sum(severity > 0),
@@ -83,9 +89,12 @@ dat_site <- dat_ifd %>%
          surface_consumption_tot_sum = surface_consumption_tot_sum/1000,
          total_power_sum = total_power_sum/1000000)
 
+# Write to file
 write.csv(dat_site, here("QF_results","SBS","qf_results_site_corrected.csv"), row.names = F)
 dat_site <- read_csv(here("QF_results","SBS","qf_results_site_corrected.csv"))
 
+#########
+## Create correlation plot for all QF outputs
 dat_site_pairs <- dat_site
 names(dat_site_pairs)[3:14] <- c("Percent Burned at\nModerate to High Severity\non Steep Slopes",
                                  "Average dNBR",
@@ -100,7 +109,7 @@ names(dat_site_pairs)[3:14] <- c("Percent Burned at\nModerate to High Severity\n
                                  "Average Surface\nResidence Time (s)",
                                  "Total Energy (GW)"
                                  )
-
+# first with steep-severe percent
 corr_plot_ss <- ggpairs(dat_site_pairs, 
         columns = c(3,5:14), 
         upper = list(continuous = corr_upper),
@@ -108,7 +117,7 @@ corr_plot_ss <- ggpairs(dat_site_pairs,
   theme(strip.text.y = element_text(angle=0),
         strip.text.x = element_text(angle=90),
         axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
-
+# then with dNBR
 corr_plot_dnbr <- ggpairs(dat_site_pairs, 
                         columns = c(4:14), 
                         upper = list(continuous = corr_upper),
@@ -119,8 +128,20 @@ corr_plot_dnbr <- ggpairs(dat_site_pairs,
 
 ggsave("correlation_matrix_responses.png", plot = corr_plot_ss, path = here("Plots"), width = 9, height=7.5)
 
+# just the response variables
 corr_ss_dnbr <- ggpairs(dat_site_pairs[3:4])
 ggsave("correlation_ss_dnbr.png", plot = corr_ss_dnbr, path = here("Plots"), width=5, height= 5)
+
+# both response variables and all predictors
+corr_plot_both <- ggpairs(dat_site_pairs, 
+                          columns = c(3:13), 
+                          upper = list(continuous = corr_upper),
+                          lower = list(continuous = corr_lower)) +
+  theme(strip.text.y = element_text(angle=0),
+        strip.text.x = element_text(angle=90),
+        axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
+ggsave("correlation_matrix_responses_predictors.png", 
+       plot = corr_plot_both, path = here("Plots"), width = 10, height=7.75)
 
 ########
 dat_long <- dat_site %>%
