@@ -1,6 +1,8 @@
 library(here)
 library(tidyverse)
 library(tidymodels)
+library(themis)
+library(vip)
 
 dat <- read.csv(here("all_data_expandedsampling_site.csv")) %>%
   mutate(high_sev_bin = factor(high_sev_bin))
