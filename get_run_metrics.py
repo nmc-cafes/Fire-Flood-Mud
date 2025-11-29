@@ -18,9 +18,6 @@ def plot_array(x, title):
     plt.show()
 
 
-runs_dir = Path("/Volumes/easystore/Fire-Flood-Mud/QF_runs/SBS")
-
-
 def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
     mburnt = sim.get_output("mburnt_integ")
     mburnt_arr = mburnt.to_numpy(timestep=len(mburnt.times) - 1)
@@ -227,41 +224,43 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
     return max_react
 
 
-fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+# fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+fires = ["CedarCreek", "CubCreek2"]
+runs_dir = Path("D:/Fire-Flood-Mud/QF_runs/SBS")
 for fire in fires:
     fire_dir = runs_dir / fire
-    out_dir = Path(__file__).parent / "QF_results" / "SBS" / fire
+    out_dir = Path(__file__).parent / "Arrays" / fire
     out_dir.mkdir(exist_ok=True)
-    sites = [f"{fire[:3]}{i}" for i in range(1, 21)]
+    sites = [f"{fire[:3]}{i}_COR" for i in range(1, 4)]
     for run in sites:
-        print(run)
         runpath = fire_dir / run
-        print("  - getting simulation inputs")
-        sim_inputs = SimulationInputs.from_json(runpath / f"{run}.json")
-        nz, ny, nx = (
-            sim_inputs.quic_fire.nz,
-            sim_inputs.qu_simparams.ny,
-            sim_inputs.qu_simparams.nx,
-        )
-        print("  - getting simulation outputs")
-        sim_outputs = SimulationOutputs(runpath / "Output", nz, ny, nx)
+        if runpath.exists():
+            print(run)
+            print("  - getting simulation inputs")
+            sim_inputs = SimulationInputs.from_json(runpath / f"{run}.json")
+            nz, ny, nx = (
+                sim_inputs.quic_fire.nz,
+                sim_inputs.qu_simparams.ny,
+                sim_inputs.qu_simparams.nx,
+            )
+            print("  - getting simulation outputs")
+            sim_outputs = SimulationOutputs(runpath / "Output", nz, ny, nx)
+            outpath = out_dir / run
+            outpath.mkdir(exist_ok=True)
 
-        outpath = out_dir / run
-        outpath.mkdir(exist_ok=True)
+            PLOT = False
 
-        PLOT = True if run == "Cal1" else False
-
-        print("\t- getting mass burnt")
-        get_mass_burnt(sim_outputs, outpath, PLOT)
-        print("\t- getting surface fuel moisture")
-        get_surface_moisture(sim_outputs, outpath, PLOT)
-        print("\t- getting surface consumption")
-        get_surface_consumption(sim_outputs, outpath, PLOT)
-        print("\t- getting canopy consumption")
-        get_canopy_consumption(sim_outputs, outpath, PLOT)
-        print("\t- getting power variables")
-        get_power(sim_outputs, outpath, PLOT)
-        print("\t- getting canopy residence time")
-        get_canopy_residence_time(sim_outputs, outpath, PLOT)
-        # print("\t- getting max reaction rate")
-        # get_max_reaction_rate(sim_outputs, arrpath, True)
+            print("\t- getting mass burnt")
+            get_mass_burnt(sim_outputs, outpath, PLOT)
+            print("\t- getting surface fuel moisture")
+            get_surface_moisture(sim_outputs, outpath, PLOT)
+            print("\t- getting surface consumption")
+            get_surface_consumption(sim_outputs, outpath, PLOT)
+            print("\t- getting canopy consumption")
+            get_canopy_consumption(sim_outputs, outpath, PLOT)
+            print("\t- getting power variables")
+            get_power(sim_outputs, outpath, PLOT)
+            print("\t- getting canopy residence time")
+            get_canopy_residence_time(sim_outputs, outpath, PLOT)
+            # print("\t- getting max reaction rate")
+            # get_max_reaction_rate(sim_outputs, arrpath, True)

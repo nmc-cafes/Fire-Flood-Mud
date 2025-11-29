@@ -17,24 +17,25 @@ def main():
     ensemble_dir = Path("D:/Fire-Flood-Mud/QF_runs/SBS")
 
     # Get a list of all executable files in the directory
-    fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
-    # fires = ["Dixie", "KNP"]
+    # fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
+    fires = ["CedarCreek", "CubCreek2"]
     executables = []
     for fire in fires:
         for site in range(1, 21):
-            output = os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}", "Output")
-            indexes = os.path.join(output, "fire_indexes.bin")
-            if os.path.exists(indexes) == False:
-                rmtree(output)
-                exe = os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}")
+            if os.path.exists(
+                os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}_COR")
+            ):
+                exe = os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}_COR")
                 simparams = QU_Simparams.from_file(
-                    os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}")
+                    os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}_COR")
                 )
                 simparams.quic_domain_height = 3000
-                simparams.to_file(os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}"))
+                simparams.to_file(
+                    os.path.join(ensemble_dir, fire, f"{fire[:3]}{site}_COR")
+                )
                 executables.append(exe)
     # Number of concurrent processes
-    concurrent_processes = 3
+    concurrent_processes = 4
 
     # Create a pool of workers
     pool = Pool(processes=concurrent_processes)
