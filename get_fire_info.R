@@ -47,7 +47,6 @@ percent_steep(knp, knp_dem)
 percent_steep(cedar, ced_dem)
 percent_steep(cub, cub_dem)
 
-
 cal_sbs <- rast(here("Caldor","Caldor_SBS.tif"))
 cal_sbs <- project(cal_sbs, cal_dem, method="near")
 dix_sbs <- rast(here("Dixie","Dixie_SBS.tif"))
@@ -102,6 +101,29 @@ for(severity in names(cub_sev)){
   cub_sev[[severity]] <- percent_at_severity(cub, cub_sbs, severity)
 }
 
+percent_severe_on_steep <- function(perim, sbs, dem){
+  slope <- terrain(dem)
+  slope_msk <- mask(slope, perim)
+  steep <- classify(slope_msk, 
+                    rcl = matrix(c(0,23,0,23,Inf,1), 
+                                 nrow=2,
+                                 byrow = T))
+  sev_msk <- mask(sbs, perim)
+  mod_to_high <- sev_msk
+  mod_to_high[mod_to_high%in%c(1,2,15)] <- 0
+  mod_to_high[mod_to_high>0] <- 1
+  steep_sev <- steep*mod_to_high
+  ss_vals <- values(steep_sev, mat=F, na.rm=T)
+  sev_vals <- values(mod_to_high, mat=F, na.rm=T)
+  pct <- length(ss_vals[ss_vals==1])/length(sev_vals[sev_vals==1])
+  cat(pct)
+}
+
+cal_ss <- percent_severe_on_steep(caldor, cal_sbs, cal_dem)
+dix_ss <- percent_severe_on_steep(dixie, dix_sbs, dix_dem)
+knp_ss <- percent_severe_on_steep(knp, knp_sbs, knp_dem)
+ced_ss <- percent_severe_on_steep(cedar, ced_sbs, ced_dem)
+cub_ss <- percent_severe_on_steep(cub, cub_sbs, cub_dem)
 
 bps_wa <- rast(here("LANDFIRE","LF2016_BPS_WA","LC16_BPS_200.tif"))
 cedar_proj <- project(cedar, bps_wa)
