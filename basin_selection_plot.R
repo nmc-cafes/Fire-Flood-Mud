@@ -48,7 +48,7 @@ severity_cropped <- crop_severity(severity, 0.125, 0.025, 0, 0)
 
 mtbs_colors <-c("#006400","#7fffd4","#ffff00","#ff0000")
 
-sites <- sites %>% mutate(severe = factor(severe, levels = c(0,1), labels = c("Low Risk","High Risk")))
+sites <- sites %>% mutate(severe = factor(severe, levels = c(0,1), labels = c("Low Hazard","High Hazard")))
 
 
 openmap11 <- get_tiles(vect(ext(severity_cropped),crs=crs(severity_cropped)),
