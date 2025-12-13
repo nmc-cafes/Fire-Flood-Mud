@@ -143,6 +143,28 @@ corr_plot_both <- ggpairs(dat_site_pairs,
 ggsave("correlation_matrix_responses_predictors.png", 
        plot = corr_plot_both, path = here("Plots"), width = 10, height=7.75)
 
+# predictors only
+corr_plot_pred <- ggpairs(dat_site_pairs, 
+                          columns = c(5:13), 
+                          upper = list(continuous = corr_upper),
+                          lower = list(continuous = corr_lower)) +
+  theme(strip.text.y = element_text(angle=0),
+        strip.text.x = element_text(angle=90),
+        axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
+ggsave("correlation_matrix_predictors.png", 
+       plot = corr_plot_pred, path = here("Plots"), width = 10, height=7.75)
+
+cor_mat <- cor(dat_site_pairs[,5:13])
+
+cor_pairs <- cor_mat %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("var1") %>%
+  pivot_longer(-var1, names_to = "var2", values_to = "correlation") %>%
+  filter(var1 < var2,          # keep each pair once (remove duplicates & diagonal)
+         correlation > 0.8)
+View(cor_pairs)
+
+
 ########
 dat_long <- dat_site %>%
   pivot_longer(cols = 5:14,
