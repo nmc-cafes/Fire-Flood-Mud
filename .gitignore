@@ -27,3 +27,6 @@ KNP/allplotarchiveout.csv
 .Rhistory
 .Rproj.user
 .DS_Store
+
+# Ignore temporary files
+temp_**
