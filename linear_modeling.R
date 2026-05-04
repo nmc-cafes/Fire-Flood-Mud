@@ -529,7 +529,7 @@ mod_sim <- simulateResiduals(final_model_dnbr)
 plot(mod_sim)
 print(summary(final_model_dnbr))
 print(r.squaredGLMM(final_model_dnbr))
-rmse_final <- sqrt(mean(residuals(final_model_dnbr)^2))
+rmse_final_dnbr <- sqrt(mean(residuals(final_model_dnbr)^2))
 rmse_final_dnbr
 check_singularity(final_model_dnbr)
 check_collinearity(final_model_dnbr)
