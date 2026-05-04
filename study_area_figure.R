@@ -1,10 +1,16 @@
 library(here)
+library(ggstar)
 library(tidyverse)
 library(terra)
 library(tidyterra)
 library(ggthemes)
 library(patchwork)
 library(ggspatial)
+library(basemaps)
+library(maptiles)
+library(ggnewscale)
+
+map_token <- "V2tHpgnaN9td5HYNOV9C"
 
 read_severity <- function(path){
   rst <- rast(path)
@@ -45,15 +51,34 @@ read_SBS <- function(path){
   return(rst)
 }
 
+read_ig <- function(path, dixie=F){
+  vct <- vect(path)
+  vct <- project(vct, "EPSG:5070")
+  vct$DateCurren <- as.Date(vct$DateCurren)
+  if(dixie){
+    dix_ig_pols <- vct[vct$DateCurren=="2021-07-17",]
+    ig_pols <- dix_ig_pols[2,]
+  } else{
+    ig_pols <- vct[vct$DateCurren==min(vct$DateCurren),]
+  }
+  ig <- centroids(ig_pols)
+  ig_df <- as.data.frame(ig, geom="XY")
+  return(ig_df)
+}
+
 states <- vect(here("cb_2018_us_state_20m","cb_2018_us_state_20m.shp"))
 conus <- states %>% filter(!NAME %in% c("Alaska","Hawaii","Puerto Rico"))
-conus <- project(conus, "EPSG:5070")
+conus <- project(conus, "EPSG:3857")
 firestates <- conus %>% filter(NAME %in% c("California","Washington"))
 
 west_ext <- ext(conus)
-west_ext[2] <- ((ext(conus)[2]-ext(conus)[1])*0.2) + ext(conus)[1]
-west_ext[3] <- ((ext(conus)[4]-ext(conus)[3])*0.5) + ext(conus)[3]
-west_ext[4] <- ext(conus)[4] - ((ext(conus)[4]-ext(conus)[3])*0.02)
+west_ext[1] <- ext(conus)[1] - ((ext(conus)[2]-ext(conus)[1])*0.005)
+west_ext[2] <- ((ext(conus)[2]-ext(conus)[1])*0.125) + ext(conus)[1]
+west_ext[3] <- ((ext(conus)[4]-ext(conus)[3])*0.4) + ext(conus)[3]
+west_ext[4] <- ext(conus)[4] - ((ext(conus)[4]-ext(conus)[3])*0.005)
+west_ext_vect <- vect(west_ext, crs=crs(conus))
+plot(conus)
+plot(west_ext_vect, add=T)
 
 knp <- vect(here("KNP","KNP_perimeter.shp"))
 caldor <- vect(here("Caldor","Caldor_perimeter.shp"))
@@ -61,17 +86,26 @@ dixie <- vect(here("Dixie","Dixie_perimeter.shp"))
 cedar <- vect(here("CedarCreek","CedarCreek_perimeter.shp"))
 cub <- vect(here("CubCreek2","CubCreek2_perimeter.shp"))
 fires <- vect(c(knp,caldor,dixie,cedar,cub))
+fires <- project(fires, "EPSG:3857")
+
+set_defaults(map_service = "maptiler", map_type = "aquarelle", map_token = map_token, map_res=1)
 
 #inset map
 inset <- ggplot() +
-  geom_spatvector(data = conus, color="gray50", fill = NA) +
-  geom_spatvector(data = firestates, color = "black", fill=NA) +
-  geom_spatvector(data = fires, aes(fill = Incid_Name), color=NA) +
-  scale_x_continuous(limits = c(west_ext[1], west_ext[2])) +
-  scale_y_continuous(limits = c(west_ext[3], west_ext[4])) +
+  basemap_gglayer(west_ext_vect) +
+  scale_fill_identity() +
+  new_scale_fill() +
+  geom_spatvector(data = fires, aes(fill = Incid_Name), color="black") +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
   scale_fill_colorblind() +
   theme_bw() +
-  theme(legend.position="none")
+  theme(legend.position="none",
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank())
+inset
+ggsave("allfires2.png", inset, path = here("Plots","study_area_fig"), height = 10, width = 5)
 
 # knp_sev <- read_severity(here("KNP","KNP_severity.tif"))
 # caldor_sev <- read_severity(here("Caldor","Caldor_severity.tif"))
@@ -84,10 +118,22 @@ dixie_sev <- read_SBS(here("Dixie","Dixie_SBS.tif"))
 cedar_sev <- read_SBS(here("CedarCreek","CedarCreek_SBS.tif"))
 cub_sev <- read_SBS(here("CubCreek2","CubCreek2_SBS.tif"))
 
+knp_ig <- read_ig(here("KNP","Fire_Progression","KNP_COMPLEX_2021_PROGRESSION_CORRECTED.shp"))
+caldor_ig <- read_ig(here("Caldor","Fire_Progression","CALDOR_2021_PROGRESSION_CORRECTED.shp"))
+dixie_ig <- read_ig(here("Dixie","Fire_Progression","DIXIE_2021_PROGRESSION_CORRECTED.shp"), dixie=T)
+cedar_ig <- read_ig(here("CedarCreek","Fire_Progression","CEDAR_CREEK_2021_PROGRESSION_CORRECTED.shp"))
+cub_ig <- read_ig(here("CubCreek2","Fire_Progression","CUB_CREEK_2_2021_PROGRESSION_CORRECTED.shp"))
+
 mtbs_colors <-c("#006400","#7fffd4","#ffff00","#ff0000","#7fff00")
 
-knp_plot <- ggplot() + 
-  geom_spatraster(data=knp_sev) + 
+knp_plot <- ggplot() +
+  geom_spatraster(data=knp_sev) +
+  geom_star(data=knp_ig,
+            aes(x=x,y=y),
+            starshape=3,
+            fill="red",
+            color="black",
+            size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
   annotation_scale() +
   theme_void() +
@@ -95,7 +141,13 @@ knp_plot <- ggplot() +
         legend.position = "none")
 
 caldor_plot <- ggplot() + 
-  geom_spatraster(data=caldor_sev) + 
+  geom_spatraster(data=caldor_sev) +
+  geom_star(data=caldor_ig,
+            aes(x=x,y=y),
+            starshape=3,
+            fill="red",
+            color="black",
+            size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
   annotation_scale() +
   theme_void() +
@@ -104,6 +156,12 @@ caldor_plot <- ggplot() +
 
 dixie_plot <- ggplot() + 
   geom_spatraster(data=dixie_sev) + 
+  geom_star(data=dixie_ig,
+            aes(x=x,y=y),
+            starshape=3,
+            fill="red",
+            color="black",
+            size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
   annotation_scale() +
   theme_void() +
@@ -111,7 +169,13 @@ dixie_plot <- ggplot() +
         legend.position = "none")
 
 cedar_plot <- ggplot() + 
-  geom_spatraster(data=cedar_sev) + 
+  geom_spatraster(data=cedar_sev) +
+  geom_star(data=cedar_ig,
+            aes(x=x,y=y),
+            starshape=3,
+            fill="red",
+            color="black",
+            size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
   annotation_scale() +
   theme_void() +
@@ -119,14 +183,19 @@ cedar_plot <- ggplot() +
         legend.position = "none")
 
 cub_plot <- ggplot() + 
-  geom_spatraster(data=cub_sev) + 
+  geom_spatraster(data=cub_sev) +
+  geom_star(data=cub_ig,
+            aes(x=x,y=y),
+            starshape=3,
+            fill="red",
+            color="black",
+            size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
   annotation_scale() +
   theme_void() +
   theme(legend.title = element_blank(),
         legend.position = "none")
 
-ggsave("allfires.png", inset, path = here("Plots","study_area_fig"), height = 5.5, width = 4)
 # ggsave("knp.png", knp_plot, path = here("Plots","study_area_fig"), height = 4, width = 4)
 # ggsave("caldor.png", caldor_plot, path = here("Plots","study_area_fig"), height = 4, width = 4)
 # ggsave("dixie.png", dixie_plot, path = here("Plots","study_area_fig"), height = 4, width = 4)
