@@ -131,7 +131,7 @@ knp_plot <- ggplot() +
   geom_star(data=knp_ig,
             aes(x=x,y=y),
             starshape=3,
-            fill="red",
+            fill="black",
             color="black",
             size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
@@ -145,7 +145,7 @@ caldor_plot <- ggplot() +
   geom_star(data=caldor_ig,
             aes(x=x,y=y),
             starshape=3,
-            fill="red",
+            fill="black",
             color="black",
             size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
@@ -159,7 +159,7 @@ dixie_plot <- ggplot() +
   geom_star(data=dixie_ig,
             aes(x=x,y=y),
             starshape=3,
-            fill="red",
+            fill="black",
             color="black",
             size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
@@ -173,7 +173,7 @@ cedar_plot <- ggplot() +
   geom_star(data=cedar_ig,
             aes(x=x,y=y),
             starshape=3,
-            fill="red",
+            fill="black",
             color="black",
             size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
@@ -187,7 +187,7 @@ cub_plot <- ggplot() +
   geom_star(data=cub_ig,
             aes(x=x,y=y),
             starshape=3,
-            fill="red",
+            fill="black",
             color="black",
             size=3) +
   scale_fill_manual(values = mtbs_colors, na.value = NA) +
