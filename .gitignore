@@ -13,9 +13,11 @@
 !*.Rproj
 
 # Descend into directories
+!Python/
+!R/
 !Duet/
-!Dixie/
-!Caldor/
+!Fire_Data/Dixie/
+!Fire_Data/Caldor/
 !KNP/
 KNP/allplotarchiveout.csv
 
