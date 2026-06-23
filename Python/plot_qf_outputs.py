@@ -25,7 +25,7 @@ def plot_array(x: np.ndarray, title: str):
 
 
 runs_dir = Path("D:/Fire-Flood-Mud/QF_runs/SBS")
-HERE = Path(__file__).parent
+HERE = Path(__file__).parent.parent
 fires = ["CedarCreek", "CubCreek2"]
 for fire in fires:
     for site in range(1, 21):

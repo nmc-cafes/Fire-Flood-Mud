@@ -38,7 +38,7 @@ import duet_tools as duet
 
 
 def main():
-    HERE = Path("/Users/ntutland/Documents/Projects/Fire-Flood-Mud")
+    HERE = Path(__file__).parent.parent
     sites_path = HERE / "Sample_Basins_SBS.csv"
     fire_df = pd.read_csv(sites_path)
     fire_gdf = gpd.GeoDataFrame(

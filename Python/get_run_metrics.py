@@ -18,7 +18,7 @@ def plot_array(x, title):
     plt.show()
 
 
-runs_dir = Path("/Volumes/easystore/Fire-Flood-Mud/QF_runs/SBS")
+runs_dir = Path(__file__).parent.parent / "QF_runs" / "SBS"
 
 
 def get_mass_burnt(sim: SimulationOutputs, arrpath: Path, plot: bool = True):
@@ -230,7 +230,7 @@ def get_max_reaction_rate(sim: SimulationOutputs, arrpath: Path, plot: bool = Tr
 fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 for fire in fires:
     fire_dir = runs_dir / fire
-    out_dir = Path(__file__).parent / "QF_results" / "SBS" / fire
+    out_dir = Path(__file__).parent.parent / "QF_results" / "SBS" / fire
     out_dir.mkdir(exist_ok=True)
     sites = [f"{fire[:3]}{i}" for i in range(1, 21)]
     for run in sites:

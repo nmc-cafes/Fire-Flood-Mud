@@ -7,6 +7,7 @@ Created on Thu Aug  3 11:16:05 2023
 """
 
 import os
+from pathlib import Path
 import pandas as pd
 import geopandas as gpd
 from shapely import Polygon
@@ -64,7 +65,7 @@ def make_bbox(pnt, dim, epsg):
     return poly_gdf
 
 if __name__ == '__main__':
-    OG_PATH = os.getcwd()
+    OG_PATH = Path(__file__).parent.parent
     sites_path = os.path.join(OG_PATH,"Sample_Sites")
     fire_name = "Dixie"
     EPSG = 5070

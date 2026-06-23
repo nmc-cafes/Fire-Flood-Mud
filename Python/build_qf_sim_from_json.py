@@ -6,7 +6,7 @@ qf_dir = Path("D:/Fire-Flood-Mud/QF_runs/SBS")
 
 fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 qf_path = (
-    Path(__file__).parent.parent.parent
+    Path(__file__).parent.parent.parent.parent
     / "Quicfire"
     / "QF_6.0.1"
     / "exe"

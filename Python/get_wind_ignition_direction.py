@@ -7,6 +7,7 @@ Created on Tue Oct  3 09:15:16 2023
 """
 
 import os
+from pathlib import Path
 import numpy as np
 # from scipy.io import FortranFile
 # from TTRS_QUICFire_Support import plot_array
@@ -144,12 +145,12 @@ def pol2cart(rho, phi):
     return(x, y)
 
 if __name__=='__main__':
-    OG_PATH = os.getcwd()
+    OG_PATH = Path(__file__).parent.parent
     fire_name = "Dixie"
     site_name = "Chips"
     plot_size = 500
-    site_path = os.path.join(OG_PATH, fire_name, "Sample_Sites", site_name, site_name+"_bounds_"+str(plot_size)+"m.shp")
-    ignite_path = os.path.join(OG_PATH, fire_name, "Sample_Sites", site_name, "QF_runs", str(plot_size)+"m", "ignite.dat")
+    site_path = os.path.join(OG_PATH, "Fire_Data", fire_name, "Sample_Sites", site_name, site_name+"_bounds_"+str(plot_size)+"m.shp")
+    ignite_path = os.path.join(OG_PATH, "Fire_Data", fire_name, "Sample_Sites", site_name, "QF_runs", str(plot_size)+"m", "ignite.dat")
     date = (2021, 7, 19)
     side_length = 302
     main(site_path, date, side_length, ignite_path)

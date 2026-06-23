@@ -7,6 +7,7 @@ Created on Mon Oct  9 16:18:21 2023
 """
 
 import os
+from pathlib import Path
 import json
 import zarr
 import geopandas as gpd
@@ -62,7 +63,7 @@ def run_fastfuels(site_path,site_name,fire_name,duet_path,pad=0):
     ff.export_zarr_to_quicfire(zarr_immutable, qf_path)
 
 if __name__=='__main__':
-    OG_PATH = os.getcwd()
+    OG_PATH = Path(__file__).parent.parent
     fire_name = "Dixie"
     site_name = "Chips"
     plot_size = 500

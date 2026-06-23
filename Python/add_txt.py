@@ -1,6 +1,6 @@
 from pathlib import Path
 
-arrays_path = Path(__file__).parent / "Arrays"
+arrays_path = Path(__file__).parent.parent / "Arrays"
 
 fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
 for fire in fires:

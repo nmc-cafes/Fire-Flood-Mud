@@ -13,7 +13,7 @@ outputs = [
     "residence_time_consumption",
     "max_reaction_rate",
 ]
-runs_path = Path(__file__).parent / "Arrays" / "Caldor"
+runs_path = Path(__file__).parent.parent / "Arrays" / "Caldor"
 
 all_dat = pd.DataFrame()
 for i in range(len(runs)):

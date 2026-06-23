@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 WRITE_FUELLIST = True
 COMBINE_FUELS = False
-HERE = Path(__file__).parent
+HERE = Path(__file__).parent.parent
 
 if WRITE_FUELLIST:
     xtb = list(np.linspace(2, 602, num=round(604 / 4)))

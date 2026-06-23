@@ -34,7 +34,7 @@ run_dict = {
     "CubCreek2": [0.08, 0.18, 0.08],
 }
 
-qf_exe = Path(__file__).parent.parent.parent / "Quicfire" / "QF_6.0.1" / "exe"
+qf_exe = Path(__file__).parent.parent.parent.parent / "Quicfire" / "QF_6.0.1" / "exe"
 
 fires = ["Caldor", "Dixie", "KNP", "CedarCreek", "CubCreek2"]
 for i in range(len(fires)):
@@ -43,7 +43,7 @@ for i in range(len(fires)):
             if j == 5:
                 print(f"{fires[i][:3]}{j}")
                 site_dict = (
-                    Path(__file__).parent
+                    Path(__file__).parent.parent
                     / fires[i]
                     / "Sample_Basins"
                     / f"{fires[i][:3]}{j}"
@@ -74,7 +74,7 @@ for i in range(len(fires)):
                 ]
                 for fire in run_dict.keys():
                     qf_dict = (
-                        Path(__file__).parent
+                        Path(__file__).parent.parent
                         / "QF_runs"
                         / fires[i]
                         / f"{fires[i][:3]}{j}"
@@ -82,7 +82,7 @@ for i in range(len(fires)):
                     qf_dict.mkdir(exist_ok=True)
 
                     json_dict = (
-                        Path(__file__).parent
+                        Path(__file__).parent.parent
                         / "QF_runs"
                         / fires[i]
                         / f"{fires[i][:3]}{j}"

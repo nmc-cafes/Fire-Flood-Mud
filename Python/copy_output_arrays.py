@@ -1,7 +1,7 @@
 from pathlib import Path
 from shutil import copytree
 
-dst_dir = Path(__file__).parent / "Arrays"
+dst_dir = Path(__file__).parent.parent / "Arrays"
 dst_dir.mkdir(exist_ok=True)
 
 fires = ["Caldor", "CedarCreek", "CubCreek2", "Dixie", "KNP"]
