@@ -8,9 +8,9 @@ library(gifski)
 library(basemaps)
 library(maptiles)
 
-prog <- vect(here("CedarCreek",
+prog <- vect(here("Caldor",
                   "Fire_Progression",
-                  "CEDAR_CREEK_2021_PROGRESSION_CORRECTED.shp")) %>% 
+                  "CALDOR_2021_PROGRESSION_CORRECTED.shp")) %>% 
   project("EPSG:5070")
 prog <- prog %>%
   mutate(DateCurren = as.Date(DateCurren))
@@ -120,6 +120,15 @@ for(i in 1:length(dates_sort2)){
 }
 prog_growth$GrowthRate[prog_growth$GrowthRate<0] <- 0
 
+max_gr <- prog_growth %>% 
+  slice_max(GrowthRate) %>% 
+  select(DateCurren, GrowthRate) %>%
+  mutate(GrowthRate = GrowthRate*0.0040468564)
+next_week <- prog_growth %>% 
+  filter(DateCurren > as.Date("2021-09-02"), DateCurren < as.Date("2021-10-01")) %>% 
+  select(DateCurren, GrowthRate) %>%
+  mutate(GrowthRate = GrowthRate*0.0040468564)
+
 p1 <- ggplot() +
   geom_spatvector(data=prog_growth,
                   aes(fill=GrowthRate)) +
@@ -144,7 +153,7 @@ daily_growth <- tibble(date = dates_sort2,
 for(i in 1:nrow(unique(daily_growth))){
   daily_growth[daily_growth$date==dates_sort2[i],]$growth_rate <- prog_growth[prog_growth$DateCurren==dates_sort2[i],]$GrowthRate[1]
   }
-
+daily_growth <- daily_growth %>% mutate(growth_rate = growth_rate*0.0040468564)
 ggplot() +
   geom_line(data=daily_growth,
             aes(date,growth_rate)) +
