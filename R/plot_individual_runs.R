@@ -61,18 +61,18 @@ output <- "mass_burnt_pct"
 
 j <- 5
 
-dem <- rast(here(fires[j], paste0(fires[j],"_DEM.tif")))
-severity <- rast(here(fires[j],paste0(fires[j],"_SBS.tif")))
-dnbr <- rast(here(fires[j],paste0(fires[j],"_dNBR.tif")))
+dem <- rast(here("Fire_Data",fires[j], paste0(fires[j],"_DEM.tif")))
+severity <- rast("Fire_Data",here(fires[j],paste0(fires[j],"_SBS.tif")))
+dnbr <- rast(here("Fire_Data",fires[j],paste0(fires[j],"_dNBR.tif")))
 slope <- terrain(dem, v="slope", unit="degree")
-basins <- vect(here(fires[j],paste0(fires[j],"_sample_basins_sbs.shp")))
+basins <- vect(here("Fire_Data",fires[j],paste0(fires[j],"_sample_basins_sbs.shp")))
 
 # i <- 5
 for(i in 1:20){
   site <- paste0(substr(fires[j],1,3),i)
-  basin_path <- here(fires[j],"Sample_Basins",site)
+  basin_path <- here("Fire_Data",fires[j],"Sample_Basins",site)
   cat("\t",site,"\n")
-  domain <- vect(here(fires[j],"Sample_Basins",site,paste0(site,".shp")))
+  domain <- vect(here("Fire_Data",fires[j],"Sample_Basins",site,paste0(site,".shp")))
   basin <- basins[i]
   
   out_rst <- process_output(fires[j],site,output,domain,basin)

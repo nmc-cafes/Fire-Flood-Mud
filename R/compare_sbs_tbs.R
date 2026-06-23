@@ -5,9 +5,9 @@ library(tidyterra)
 
 fire <- "KNP"
 
-sites <- vect(here(fire, paste0(fire,"_sample_basins.shp")))
-tbs <- rast(here(fire, paste0(fire,"_Severity.tif")))
-sbs_raw <- rast(here(fire, paste0(fire,"_SBS.tif")))
+sites <- vect(here("Fire_Data",fire, paste0(fire,"_sample_basins.shp")))
+tbs <- rast(here("Fire_Data",fire, paste0(fire,"_Severity.tif")))
+sbs_raw <- rast(here("Fire_Data",fire, paste0(fire,"_SBS.tif")))
 
 sbs <- project(sbs_raw, tbs, method="near")
 

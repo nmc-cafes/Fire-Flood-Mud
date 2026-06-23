@@ -8,7 +8,7 @@ states <- data.frame("state"=rep("WA",2),
                      "fire"=fires)
 fire_list <- list()
 for(i in 1:length(fires)){
-  sites <- read_sf(here(fires[i],paste0(fires[i],"_corrected_basins.shp")))
+  sites <- read_sf(here("Fire_Data",fires[i],paste0(fires[i],"_corrected_basins.shp")))
   sites <- st_centroid(sites) 
   sites$Fire_Name <- fires[i]
   sites$Fire_State <- states[states$fire==fires[i],]$state

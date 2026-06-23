@@ -8,7 +8,8 @@ library(gifski)
 library(basemaps)
 library(maptiles)
 
-prog <- vect(here("Caldor",
+prog <- vect(here("Fire_Data",
+                  "Caldor",
                   "Fire_Progression",
                   "CALDOR_2021_PROGRESSION_CORRECTED.shp")) %>% 
   project("EPSG:5070")
@@ -185,12 +186,12 @@ for(i in 1:nrow(prog)){
     theme_void() +
     theme(legend.position = "none")
   date <- as.character(as.Date(prog_proj[i]$DateCurren))
-  ggsave(paste0("CedarCreek_",date,".png"),path = here("CedarCreek","Fire_Progression","Gif_Corrected"))
+  ggsave(paste0("CedarCreek_",date,".png"),path = here("Fire_Data","CedarCreek","Fire_Progression","Gif_Corrected"))
 }
 
-png_files <- list.files(here("CedarCreek","Fire_Progression","Gif_Corrected"), full.names = T)
+png_files <- list.files(here("Fire_Data","CedarCreek","Fire_Progression","Gif_Corrected"), full.names = T)
 gifski(png_files = png_files, 
-       gif_file = here("CedarCreek","Fire_Progression","CedarCreek_Corrected.gif"),
+       gif_file = here("Fire_Data","CedarCreek","Fire_Progression","CedarCreek_Corrected.gif"),
        delay = 0.5)
 
 

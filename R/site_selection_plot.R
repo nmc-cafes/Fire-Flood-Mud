@@ -5,7 +5,7 @@ library(tidyterra)
 library(ggthemes)
 
 slope_mask <- function(fire_name){
-  DEM <- rast(here(fire_name,paste0(fire_name,"_DEM.tif")))
+  DEM <- rast(here("Fire_Data",fire_name,paste0(fire_name,"_DEM.tif")))
   slope <- terrain(DEM, v="slope", neighbors=8, unit="degrees")
   rcl_mat <- matrix(c(0,23,NA,
                       23, Inf, 1),
@@ -15,10 +15,10 @@ slope_mask <- function(fire_name){
   return(slope_rcl)
 }
 
-perimeter <- vect(here("CubCreek2","CubCreek2_perimeter.shp"))
-drainage <- vect(here("CubCreek2","CubCreek2_drainage_prox_200.shp"))
-sites <- vect(here("CubCreek2","CubCreek2_sample_sites_NEW2.shp"))
-severity <- rast(here("CubCreek2", "Severity_Class_510m.tif"))
+perimeter <- vect(here("Fire_Data","CubCreek2","CubCreek2_perimeter.shp"))
+drainage <- vect(here("Fire_Data","CubCreek2","CubCreek2_drainage_prox_200.shp"))
+sites <- vect(here("Fire_Data","CubCreek2","CubCreek2_sample_sites_NEW2.shp"))
+severity <- rast(here("Fire_Data","CubCreek2", "Severity_Class_510m.tif"))
 severity <- project(severity, crs(perimeter))
 all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
 all_streams <- project(all_streams, perimeter)
@@ -29,8 +29,8 @@ buff <- buffer(perimeter, -500)
 drain_buff_mask <- terra::intersect(drainage, buff)
 perimeter_masked <- erase(perimeter, drain_buff_mask)
 
-severity_stack <- rast(here("CubCreek2","severity_stack.tif"))
-homogeneity_stack <- rast(here("CubCreek2","homogeneity_stack.tif"))
+severity_stack <- rast(here("Fire_Data","CubCreek2","severity_stack.tif"))
+homogeneity_stack <- rast(here("Fire_Data","CubCreek2","homogeneity_stack.tif"))
 
 to_vect <- function(x){
   x[x==0] <- NA

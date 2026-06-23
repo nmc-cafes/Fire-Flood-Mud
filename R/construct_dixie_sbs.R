@@ -13,4 +13,4 @@ phase3[phase3==15] <- 0
 phase12 <- mosaic(phase1, phase2, fun=max)
 phase123 <- mosaic(phase12, phase3, fun=max)
 
-writeRaster(phase123, here("Dixie","Dixie_SBS.tif"))
+writeRaster(phase123, here("Fire_Data","Dixie","Dixie_SBS.tif"))

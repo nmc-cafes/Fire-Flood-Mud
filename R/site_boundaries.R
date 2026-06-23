@@ -4,8 +4,8 @@ library(here)
 library(sf)
 
 fire_name <- "Dixie"
-sample_sites <- st_read(here(fire_name,paste0(fire_name,"_sample_sites_NJT.shp")))
-dnbr <- rast(here(fire_name,paste0(fire_name,"_dNBR.tif")))
+sample_sites <- st_read(here("Fire_Data",fire_name,paste0(fire_name,"_sample_sites_NJT.shp")))
+dnbr <- rast(here("Fire_Data",fire_name,paste0(fire_name,"_dNBR.tif")))
 
 dnbr_pts <- st_as_sf(as.points(dnbr))
 

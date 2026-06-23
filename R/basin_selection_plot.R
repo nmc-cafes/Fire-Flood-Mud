@@ -6,7 +6,7 @@ library(ggspatial)
 library(maptiles)
 
 slope_mask <- function(fire_name){
-  DEM <- rast(here(fire_name,paste0(fire_name,"_DEM.tif")))
+  DEM <- rast(here("Fire_Data",fire_name,paste0(fire_name,"_DEM.tif")))
   slope <- terrain(DEM, v="slope", neighbors=8, unit="degrees")
   rcl_mat <- matrix(c(0,23,1,
                       23, Inf, NA),

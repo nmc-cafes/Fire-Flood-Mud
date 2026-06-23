@@ -5,7 +5,8 @@ library(tidyterra)
 library(gifski)
 
 # CALDOR
-prog <- vect(here("Caldor",
+prog <- vect(here("Fire_Data",
+                  "Caldor",
                   "Fire_Progression", 
                   "CALDOR_2021_PROGRESSION.shp")) %>%
   project("EPSG:5070")
@@ -18,12 +19,12 @@ for(i in 1:nrow(prog)){
     ggtitle(prog[i]$DateCurren) +
     theme_bw()
   date <- as.character(as.Date(prog[i]$DateCurren))
-  ggsave(paste0("Caldor_",date,".png"),path = here("Caldor","Fire_Progression","Gif"))
+  ggsave(paste0("Caldor_",date,".png"),path = here("Fire_Data","Caldor","Fire_Progression","Gif"))
 }
 
-png_files <- list.files(here("Caldor","Fire_Progression","Gif"), full.names = T)
+png_files <- list.files(here("Fire_Data","Caldor","Fire_Progression","Gif"), full.names = T)
 gifski(png_files = png_files, 
-       gif_file = here("Caldor","Fire_Progression","Caldor_Uncorrected.gif"),
+       gif_file = here("Fire_Data","Caldor","Fire_Progression","Caldor_Uncorrected.gif"),
        delay = 0.5)
 
 ggplot() +
@@ -52,12 +53,14 @@ ggplot() +
 
 correct$DateCurren <- as.character(correct$DateCurren)
 writeVector(correct,
-            here("Caldor",
+            here("Fire_Data",
+                 "Caldor",
                  "Fire_Progression",
                  "CALDOR_2021_PROGRESSION_CORRECTED.shp"),
             overwrite=T)
 
-sites <- vect(here("Caldor",
+sites <- vect(here("Fire_Data",
+                   "Caldor",
                    "Caldor_sample_sites_NJT.shp"))
 correct$DateCurren <- as.Date(correct$DateCurren)
 ggplot() +
@@ -67,7 +70,8 @@ ggplot() +
   theme_bw()
 
 # CEDAR CREEK
-prog <- vect(here("CedarCreek",
+prog <- vect(here("Fire_Data",
+                  "CedarCreek",
                   "Fire_Progression", 
                   "CEDAR_CREEK_2021_PROGRESSION.shp")) %>%
   project("EPSG:5070")
@@ -91,12 +95,12 @@ for(i in 1:nrow(prog_agg)){
     ggtitle(prog_agg[i]$DateCurren) +
     theme_bw()
   date <- as.character(as.Date(prog_agg[i]$DateCurren))
-  ggsave(paste0("CedarCreek_",date,".png"),path = here("CedarCreek","Fire_Progression","Gif"))
+  ggsave(paste0("CedarCreek_",date,".png"),path = here("Fire_Data","CedarCreek","Fire_Progression","Gif"))
 }
 
-png_files <- list.files(here("CedarCreek","Fire_Progression","Gif"), full.names = T)
+png_files <- list.files(here("Fire_Data","CedarCreek","Fire_Progression","Gif"), full.names = T)
 gifski(png_files = png_files, 
-       gif_file = here("CedarCreek","Fire_Progression","CedarCreek_Uncorrected.gif"),
+       gif_file = here("Fire_Data","CedarCreek","Fire_Progression","CedarCreek_Uncorrected.gif"),
        delay = 0.5)
 
 prog$DateCurren <- as.Date(prog$DateCurren)
@@ -107,12 +111,14 @@ correct <- correct[correct$DateCurren != "2021-08-08"]
 
 correct$DateCurren <- as.character(correct$DateCurren)
 writeVector(correct,
-            here("CedarCreek",
+            here("Fire_Data",
+                 "CedarCreek",
                  "Fire_Progression",
                  "CEDAR_CREEK_2021_PROGRESSION_CORRECTED.shp"),
             overwrite=T)
 
-sites <- vect(here("CedarCreek",
+sites <- vect(here("Fire_Data",
+                   "CedarCreek",
                    "CedarCreek_sample_sites_NJT.shp"))
 correct$DateCurren <- as.Date(correct$DateCurren)
 ggplot() +
@@ -122,7 +128,8 @@ ggplot() +
   theme_bw()
 
 # MUCKAMUCK
-prog <- vect(here("Muckamuck",
+prog <- vect(here("Fire_Data",
+                  "Muckamuck",
                   "Fire_Progression", 
                   "MUCKAMUCK_2021_PROGRESSION.shp")) %>%
   project("EPSG:5070")
@@ -135,12 +142,12 @@ for(i in 1:nrow(prog)){
     ggtitle(prog[i]$DateCurren) +
     theme_bw()
   date <- as.character(as.Date(prog[i]$DateCurren))
-  ggsave(paste0("Muckamuck_",date,".png"),path = here("Muckamuck","Fire_Progression","Gif"))
+  ggsave(paste0("Muckamuck_",date,".png"),path = here("Fire_Data","Muckamuck","Fire_Progression","Gif"))
 }
 
-png_files <- list.files(here("Muckamuck","Fire_Progression","Gif"), full.names = T)
+png_files <- list.files(here("Fire_Data","Muckamuck","Fire_Progression","Gif"), full.names = T)
 gifski(png_files = png_files, 
-       gif_file = here("Muckamuck","Fire_Progression","Muckamuck_Uncorrected.gif"),
+       gif_file = here("Fire_Data","Muckamuck","Fire_Progression","Muckamuck_Uncorrected.gif"),
        delay = 0.5)
 
 prog$DateCurren <- as.Date(prog$DateCurren)
@@ -149,12 +156,14 @@ correct <- correct[correct$DateCurren != "2021-08-08"]
 
 correct$DateCurren <- as.character(correct$DateCurren)
 writeVector(correct,
-            here("Muckamuck",
+            here("Fire_Data",
+                 "Muckamuck",
                  "Fire_Progression",
                  "MUCKAMUCK_2021_PROGRESSION_CORRECTED.shp"),
             overwrite=T)
 
-sites <- vect(here("Muckamuck",
+sites <- vect(here("Fire_Data",
+                   "Muckamuck",
                    "Muckamuck_sample_sites_NJT.shp"))
 correct$DateCurren <- as.Date(correct$DateCurren)
 ggplot() +
@@ -164,7 +173,8 @@ ggplot() +
   theme_bw()
 
 # CUB CREEK
-prog <- vect(here("CubCreek2",
+prog <- vect(here("Fire_Data",
+                  "CubCreek2",
                   "Fire_Progression", 
                   "CUB_CREEK_2_2021_PROGRESSION.shp")) %>%
   project("EPSG:5070")
@@ -177,12 +187,12 @@ for(i in 1:nrow(prog)){
     ggtitle(prog[i]$DateCurren) +
     theme_bw()
   date <- as.character(as.Date(prog[i]$DateCurren))
-  ggsave(paste0("CubCreek2_",date,".png"),path = here("CubCreek2","Fire_Progression","Gif"))
+  ggsave(paste0("CubCreek2_",date,".png"),path = here("Fire_Data","CubCreek2","Fire_Progression","Gif"))
 }
 
-png_files <- list.files(here("CubCreek2","Fire_Progression","Gif"), full.names = T)
+png_files <- list.files(here("Fire_Data","CubCreek2","Fire_Progression","Gif"), full.names = T)
 gifski(png_files = png_files, 
-       gif_file = here("CubCreek2","Fire_Progression","CubCreek2_Uncorrected.gif"),
+       gif_file = here("Fire_Data","CubCreek2","Fire_Progression","CubCreek2_Uncorrected.gif"),
        delay = 0.5)
 
 prog$DateCurren <- as.Date(prog$DateCurren)
@@ -191,13 +201,15 @@ correct <- prog[!is.na(prog$DateCurren)]
 
 correct$DateCurren <- as.character(correct$DateCurren)
 writeVector(correct,
-            here("CubCreek2",
+            here("Fire_Data",
+                 "CubCreek2",
                  "Fire_Progression",
                  "CUB_CREEK_2_2021_PROGRESSION_CORRECTED.shp"),
             overwrite=T)
 
 # DIXIE
-prog <- vect(here("Dixie",
+prog <- vect(here("Fire_Data",
+                  "Dixie",
                   "Fire_Progression", 
                   "DIXIE_SUGAR_2021_PROGRESSION.shp")) %>%
   project("EPSG:5070")
@@ -221,12 +233,12 @@ for(i in 1:nrow(prog_agg)){
     ggtitle(prog_agg[i]$DateCurren) +
     theme_bw()
   date <- as.character(as.Date(prog_agg[i]$DateCurren))
-  ggsave(paste0("Dixie_",date,".png"),path = here("Dixie","Fire_Progression","Gif"))
+  ggsave(paste0("Dixie_",date,".png"),path = here("Fire_Data","Dixie","Fire_Progression","Gif"))
 }
 
-png_files <- list.files(here("Dixie","Fire_Progression","Gif"), full.names = T)
+png_files <- list.files(here("Fire_Data","Dixie","Fire_Progression","Gif"), full.names = T)
 gifski(png_files = png_files, 
-       gif_file = here("Dixie","Fire_Progression","Dixie_Uncorrected.gif"),
+       gif_file = here("Fire_Data","Dixie","Fire_Progression","Dixie_Uncorrected.gif"),
        delay = 0.5)
 
 prog$DateCurren <- as.Date(prog$DateCurren)
@@ -235,13 +247,15 @@ correct <- prog[!is.na(prog$DateCurren)]
 
 correct$DateCurren <- as.character(correct$DateCurren)
 writeVector(correct,
-            here("Dixie",
+            here("Fire_Data",
+                 "Dixie",
                  "Fire_Progression",
                  "DIXIE_2021_PROGRESSION_CORRECTED.shp"),
             overwrite=T)
 
 # KNP
-prog <- vect(here("KNP",
+prog <- vect(here("Fire_Data",
+                  "KNP",
                   "Fire_Progression", 
                   "KNP_COMPLEX_2021_PROGRESSION.shp")) %>%
   project("EPSG:5070")
@@ -265,12 +279,12 @@ for(i in 1:nrow(prog_agg)){
     ggtitle(prog_agg[i]$DateCurren) +
     theme_bw()
   date <- as.character(as.Date(prog_agg[i]$DateCurren))
-  ggsave(paste0("KNP_",date,".png"),path = here("KNP","Fire_Progression","Gif"))
+  ggsave(paste0("KNP_",date,".png"),path = here("Fire_Data","KNP","Fire_Progression","Gif"))
 }
 
-png_files <- list.files(here("KNP","Fire_Progression","Gif"), full.names = T)
+png_files <- list.files(here("Fire_Data","KNP","Fire_Progression","Gif"), full.names = T)
 gifski(png_files = png_files, 
-       gif_file = here("KNP","Fire_Progression","KNP_Uncorrected.gif"),
+       gif_file = here("Fire_Data","KNP","Fire_Progression","KNP_Uncorrected.gif"),
        delay = 0.5)
 
 prog$DateCurren <- as.Date(prog$DateCurren)
@@ -280,7 +294,8 @@ correct <- correct[correct$DateCurren != "2021-09-21"]
 
 correct$DateCurren <- as.character(correct$DateCurren)
 writeVector(correct,
-            here("KNP",
+            here("Fire_Data",
+                 "KNP",
                  "Fire_Progression",
                  "KNP_COMPLEX_2021_PROGRESSION_CORRECTED.shp"),
             overwrite=T)

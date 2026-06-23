@@ -4,7 +4,7 @@ library(terra)
 
 fires <- c("Caldor","CedarCreek","CubCreek2","Dixie","KNP")
 for (fire_name in fires){
-  basins_sampled <- vect(here(fire_name,paste0(fire_name,"_sample_basins_sbs.shp")))
+  basins_sampled <- vect(here("Fire_Data",fire_name,paste0(fire_name,"_sample_basins_sbs.shp")))
   df_in <- tibble(basin = seq(1,20,1), sev_in = basins_sampled$severe_per)
   
   dat_site <- read.csv(here("QF_results","SBS","qf_results_site.csv"))

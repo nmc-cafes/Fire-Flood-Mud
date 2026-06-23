@@ -29,16 +29,16 @@ drainage_proximity <- function(fire_name, fire_perimeter, streams, buffer_inner,
   if(save){
     print("      Saving file...")
     writeVector(drainage_buffer,
-                here(fire_name,paste0(fire_name,"_drainage_prox_",buffer_inner,".shp")),
+                here("Fire_Data",fire_name,paste0(fire_name,"_drainage_prox_",buffer_inner,".shp")),
                 overwrite = overwrite)
   }
   return(drainage_buffer)
 }
 
 stratify_severity <- function(fire_name, perimeter, epsg, write=NULL){
-  severity <- rast(here(fire_name, paste0(fire_name,"_Severity.tif")))
+  severity <- rast(here("Fire_Data",fire_name, paste0(fire_name,"_Severity.tif")))
   severity_clip <- clip_to_fire(severity, perimeter, epsg)
-  dNBR <- rast(here(fire_name, paste0(fire_name,"_dNBR.tif")))
+  dNBR <- rast(here("Fire_Data",fire_name, paste0(fire_name,"_dNBR.tif")))
   dNBR_clip <- clip_to_fire(dNBR, perimeter, epsg)
   
   high_cutoff <- min(dNBR_clip[severity_clip==4])
@@ -59,7 +59,7 @@ stratify_severity <- function(fire_name, perimeter, epsg, write=NULL){
   names(severity_stack) <- c("high","moderate","low")
   severity_stack[severity_stack>0] <- 1
   if(!is.null(write)){
-    writeRaster(severity_stack, here(fire_name, write), overwrite=T)
+    writeRaster(severity_stack, here("Fire_Data",fire_name, write), overwrite=T)
   }
   return(severity_stack)
 }
@@ -84,7 +84,7 @@ find_homogeneity <- function(x,threshold){
 }
 
 stratify_homogeneity <- function(fire_name, perimeter_buffer, threshold, epsg, write=NULL){
-  severity <- rast(here(fire_name, paste0(fire_name,"_Severity.tif")))
+  severity <- rast(here("Fire_Data",fire_name, paste0(fire_name,"_Severity.tif")))
   homogeneity <- focal(severity, w=17, fun = find_homogeneity, threshold=threshold, na.policy="omit")
   heterogeneity <- homogeneity
   heterogeneity[heterogeneity==1] <- NA
@@ -202,7 +202,7 @@ fires <- c("Dixie","Caldor","KNP","CubCreek2","CedarCreek")
 all_streams <- vect(here("Streams_NorthAmerica","riv_pfaf_7_MERIT_Hydro_v07_Basins_v01_bugfix1.shp"))
 for(fire_name in fires){
   print(fire_name)
-  perimeter <- vect(here(fire_name,paste0(fire_name,"_perimeter.shp")))
+  perimeter <- vect(here("Fire_Data",fire_name,paste0(fire_name,"_perimeter.shp")))
   # limit to within 800m of (but at least 200m from) a drainage
   print("   drainages")
   streams_clip <- clip_to_fire(all_streams, perimeter, EPSG)
@@ -236,7 +236,7 @@ for(fire_name in fires){
   }
   if(nrow(sample_sites)==size){
     print("   write")
-    writeVector(sample_sites, here(fire_name,paste0(fire_name,"_sample_sites_NEW2.shp")),overwrite=T)
+    writeVector(sample_sites, here("Fire_Data",fire_name,paste0(fire_name,"_sample_sites_NEW2.shp")),overwrite=T)
   } else{
     print("Not enough sample sites. Consider increasing spatSample size")
   }

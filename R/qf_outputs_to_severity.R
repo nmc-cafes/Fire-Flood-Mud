@@ -81,18 +81,18 @@ alldata_list <- list()
 for(j in 1:length(fires)){
   cat(fires[j],"\n")
   fire_list <- list()
-  dem <- rast(here(fires[j], paste0(fires[j],"_DEM.tif")))
-  severity <- rast(here(fires[j],paste0(fires[j],"_SBS.tif")))
-  dnbr <- rast(here(fires[j],paste0(fires[j],"_dNBR.tif")))
+  dem <- rast(hre("Fire_Data",fires[j], paste0(fires[j],"_DEM.tif")))
+  severity <- rast(hre("Fire_Data",fires[j],paste0(fires[j],"_SBS.tif")))
+  dnbr <- rast(hre("Fire_Data",fires[j],paste0(fires[j],"_dNBR.tif")))
   slope <- terrain(dem, v="slope", unit="degree")
-  # basins <- vect(here(fires[j],paste0(fires[j],"_sample_basins_sbs.shp")))
-  basins <- vect(here(fires[j],paste0(fires[j],"_corrected_basins.shp")))
+  # basins <- vect(hre("Fire_Data",fires[j],paste0(fires[j],"_sample_basins_sbs.shp")))
+  basins <- vect(hre("Fire_Data",fires[j],paste0(fires[j],"_corrected_basins.shp")))
   for(i in 1:3){
     site <- paste0(substr(fires[j],1,3),i,"_COR")
-    basin_path <- here(fires[j],"Sample_Basins_corrected",site)
+    basin_path <- hre("Fire_Data",fires[j],"Sample_Basins_corrected",site)
     if( dir.exists(basin_path)){
       cat("\t",site,"\n")
-      domain <- vect(here(fires[j],"Sample_Basins_corrected",site,paste0(site,".shp")))
+      domain <- vect(hre("Fire_Data",fires[j],"Sample_Basins_corrected",site,paste0(site,".shp")))
       basin <- basins[i]
       for(output in outputs){
         out_rst <- process_output(fires[j],site,output,domain,basin)

@@ -26,16 +26,16 @@ ext_buff <- function(rst, buffer = -50){
 #### ASSEMBLE DATASET ####
 site_df <- read.csv(here("Sample_Sites_NEW2.csv"))
 
-mtbs <- rast(here("Dixie","Dixie_dNBR.tif"))
+mtbs <- rast(here("Fire_Data","Dixie","Dixie_dNBR.tif"))
 mtbs[mtbs==-32768] <- NA
 mtbs <- disagg(mtbs, fact=15)
 names(mtbs) <- "dNBR"
 
-severity <- rast(here("Dixie", "Dixie_Severity.tif"))
+severity <- rast(here("Fire_Data","Dixie", "Dixie_Severity.tif"))
 severity <- disagg(severity, fact=15)
 names(severity) <- "severity"
 
-dem <- rast(here("Dixie", "Dixie_DEM.tif"))
+dem <- rast(here("Fire_Data","Dixie", "Dixie_DEM.tif"))
 dem <- project(dem, "EPSG:5070", res = c(2,2), method="bilinear")
 names(dem) <- "DEM"
 
@@ -45,7 +45,8 @@ for(i in 1:length(sites)){
 }
 for(site in sites){
   cat(site,"\n")
-  plot_bounds <- vect(here("Dixie",
+  plot_bounds <- vect(here("Fire_Data",
+                           "Dixie",
                            "Sample_Sites",
                            site,
                            paste0(site,"_bounds_500m.shp")))
@@ -54,5 +55,5 @@ for(site in sites){
   dem_crop <- crop(dem, ext(plot_bounds))
   ext(dem_crop) <- ext(sev_crop)
   stack <- c(mtbs_crop, sev_crop, dem_crop)
-  writeRaster(stack, here("Dixie","severity_data_for_Alex",paste0(site,".tif")))
+  writeRaster(stack, here("Fire_Data","Dixie","severity_data_for_Alex",paste0(site,".tif")))
 }

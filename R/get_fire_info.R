@@ -3,22 +3,22 @@ library(terra)
 library(tidyverse)
 library(tidyterra)
 
-caldor <- vect(here("Caldor","Caldor_perimeter.shp"))
-dixie <- vect(here("Dixie","Dixie_perimeter.shp"))
-knp <- vect(here("KNP","KNP_perimeter.shp"))
-cedar <- vect(here("CedarCreek","CedarCreek_perimeter.shp"))
-cub <- vect(here("CubCreek2","CubCreek2_perimeter.shp"))
+caldor <- vect(here("Fire_Data","Caldor","Caldor_perimeter.shp"))
+dixie <- vect(here("Fire_Data","Dixie","Dixie_perimeter.shp"))
+knp <- vect(here("Fire_Data","KNP","KNP_perimeter.shp"))
+cedar <- vect(here("Fire_Data","CedarCreek","CedarCreek_perimeter.shp"))
+cub <- vect(here("Fire_Data","CubCreek2","CubCreek2_perimeter.shp"))
 
 fires <- c(caldor,dixie,knp,cedar,cub)
 for(i in 1:length(fires)){
   print(expanse(fires[i])/1000000)
 }
 
-cal_dem <- rast(here("Caldor","Caldor_DEM.tif"))
-dix_dem <- rast(here("Dixie","Dixie_DEM.tif"))
-knp_dem <- rast(here("KNP","KNP_DEM.tif"))
-ced_dem <- rast(here("CedarCreek","CedarCreek_DEM.tif"))
-cub_dem <- rast(here("CubCreek2","CubCreek2_DEM.tif"))
+cal_dem <- rast(here("Fire_Data","Caldor","Caldor_DEM.tif"))
+dix_dem <- rast(here("Fire_Data","Dixie","Dixie_DEM.tif"))
+knp_dem <- rast(here("Fire_Data","KNP","KNP_DEM.tif"))
+ced_dem <- rast(here("Fire_Data","CedarCreek","CedarCreek_DEM.tif"))
+cub_dem <- rast(here("Fire_Data","CubCreek2","CubCreek2_DEM.tif"))
 
 elev_range <- function(perim, dem){
   msk <- mask(dem, perim)
@@ -47,15 +47,15 @@ percent_steep(knp, knp_dem)
 percent_steep(cedar, ced_dem)
 percent_steep(cub, cub_dem)
 
-cal_sbs <- rast(here("Caldor","Caldor_SBS.tif"))
+cal_sbs <- rast(here("Fire_Data","Caldor","Caldor_SBS.tif"))
 cal_sbs <- project(cal_sbs, cal_dem, method="near")
-dix_sbs <- rast(here("Dixie","Dixie_SBS.tif"))
+dix_sbs <- rast(here("Fire_Data","Dixie","Dixie_SBS.tif"))
 dix_sbs <- project(dix_sbs, dix_dem, method="near")
-knp_sbs <- rast(here("KNP","KNP_SBS.tif"))
+knp_sbs <- rast(here("Fire_Data","KNP","KNP_SBS.tif"))
 knp_sbs <- project(knp_sbs, knp_dem, method="near")
-ced_sbs <- rast(here("CedarCreek","CedarCreek_SBS.tif"))
+ced_sbs <- rast(here("Fire_Data","CedarCreek","CedarCreek_SBS.tif"))
 ced_sbs <- project(ced_sbs, ced_dem, method="near")
-cub_sbs <- rast(here("CubCreek2","CubCreek2_SBS.tif"))
+cub_sbs <- rast(here("Fire_Data","CubCreek2","CubCreek2_SBS.tif"))
 cub_sbs <- project(cub_sbs, cub_dem, method="near")
 
 percent_at_severity <- function(perim, sbs, severity){

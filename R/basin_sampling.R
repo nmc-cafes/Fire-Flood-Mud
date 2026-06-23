@@ -22,7 +22,7 @@ fires <- c("KNP","Caldor","CedarCreek","CubCreek2","Dixie")
 for(fire in fires){
   cat(paste0("\n",fire,"\n"))
   cat("   Calculating basin areas")
-  basins <- vect(here(fire,paste0(fire,"_Basins.shp")))
+  basins <- vect(here("Fire_Data",fire,paste0(fire,"_Basins.shp")))
   basins$area <- expanse(basins, unit = "ha")
   
   basins <- basins %>%
@@ -45,7 +45,7 @@ for(fire in fires){
   # boxplot(basins$area_ext)
   # summary(basins$area_ext)
   
-  dem <- rast(here(fire,paste0(fire,"_DEM.tif")))
+  dem <- rast(here("Fire_Data",fire,paste0(fire,"_DEM.tif")))
   slope <- terrain(dem, v="slope", unit = "degrees")
   
   basins_clean <- basins %>%
@@ -82,7 +82,7 @@ for(fire in fires){
   #   scale_fill_viridis_c() +
   #   theme_bw()
   
-  severity <- rast(here(fire,paste0(fire,"_SBS.tif")))
+  severity <- rast(here("Fire_Data",fire,paste0(fire,"_SBS.tif")))
   severity <- project(severity, "EPSG:5070", method="near")
   names(severity) <- "severity"
 
@@ -111,30 +111,30 @@ for(fire in fires){
   #   scale_fill_viridis_c() +
   #   theme_bw()
   
-  writeVector(basins_steep, here(fire, paste0(fire,"_basins_sensitivity_sbs.shp")), overwrite=T)
+  writeVector(basins_steep, here("Fire_Data",fire, paste0(fire,"_basins_sensitivity_sbs.shp")), overwrite=T)
 }
 
 ## Determine severity cutoff using threshold_sensitivity_analysis.R
 
 severity_cutoff <- 25
 for(fire in fires){
-  basins_steep <- vect(here(fire, paste0(fire,"_basins_sensitivity_sbs.shp")))
+  basins_steep <- vect(here("Fire_Data",fire, paste0(fire,"_basins_sensitivity_sbs.shp")))
   basins_final <- basins_steep %>%
     mutate(severe = if_else(severe_per > severity_cutoff, 1, 0)) %>%
     mutate(severe = factor(severe))
 
   basins_sampled <- basins_final %>% slice_sample(n=10, by=severe)
-  writeVector(basins_sampled, here(fire, paste0(fire,"_sample_basins_sbs.shp")), overwrite=T)
+  writeVector(basins_sampled, here("Fire_Data",fire, paste0(fire,"_sample_basins_sbs.shp")), overwrite=T)
 }
 
 for(fire in c("CedarCreek","CubCreek2")){
-  basins_steep <- vect(here(fire, paste0(fire,"_basins_sensitivity_sbs.shp")))
+  basins_steep <- vect(here("Fire_Data",fire, paste0(fire,"_basins_sensitivity_sbs.shp")))
   basins_final <- basins_steep %>%
     mutate(severe = if_else(severe_per > severity_cutoff, 1, 0)) %>%
     mutate(severe = factor(severe))
 
   basins_sampled <- basins_final %>% slice_sample(n=10, by=severe)
-  writeVector(basins_sampled, here(fire, paste0(fire,"_sample_basins_sbs_CORRECTED.shp")), overwrite=T)
+  writeVector(basins_sampled, here("Fire_Data",fire, paste0(fire,"_sample_basins_sbs_CORRECTED.shp")), overwrite=T)
 }
 
 cedar_basins <- vect(here("CedarCreek","CedarCreek_sample_basins_sbs_CORRECTED.shp"))
@@ -148,7 +148,7 @@ writeVector(cub_basins_sample, here("CubCreek2","CubCreek2_corrected_basins.shp"
 
 ##############
 fire <- "CubCreek2"
-basins_sampled <- vect(here(fire,paste0(fire,"_sample_basins_sbs.shp")))
+basins_sampled <- vect(here("Fire_Data",fire,paste0(fire,"_sample_basins_sbs.shp")))
 
 ggplot() +
   geom_spatvector(data=basins_sampled, aes(fill = severe)) +
@@ -175,7 +175,7 @@ basins_df %>%
   geom_point(aes(steep_perc,severe_per, size=area_ext)) +
   theme_bw()
 
-bounds <- vect(here(fire,paste0(fire,"_Perimeter.shp")))
+bounds <- vect(here("Fire_Data",fire,paste0(fire,"_Perimeter.shp")))
 ggplot() +
   geom_spatvector(data=bounds, fill=NA) +
   geom_spatvector(data=basins_sampled,

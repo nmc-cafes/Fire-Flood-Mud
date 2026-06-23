@@ -2,10 +2,10 @@ library(here)
 library(terra)
 library(tidyterra)
 
-dem <- rast(here("Caldor","Caldor_DEM.tif"))
+dem <- rast(here("Fire_Data","Caldor","Caldor_DEM.tif"))
 dem <- project(dem, "EPSG:5070")
 
-site <- vect(here("Caldor","Sample_Sites","Caldor5","Caldor5_bounds_500m.shp"))
+site <- vect(here("Fire_Data","Caldor","Sample_Sites","Caldor5","Caldor5_bounds_500m.shp"))
 site_dem <- crop(dem,site)
 plot(site_dem)
 contour(site_dem, add=T)

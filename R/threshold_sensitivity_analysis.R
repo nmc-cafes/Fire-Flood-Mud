@@ -26,7 +26,7 @@ kfact <- project(kfact, "EPSG:5070")
 fires <- c("Caldor","Dixie","KNP")
 kfact_df <- tibble(fire_name = fires, avg_kfact = rep(NA, length(fires)))
 for(fire in fires){
-  perim <- vect(here(fire,paste0(fire,"_Perimeter.shp")))
+  perim <- vect(here("Fire_Data",fire,paste0(fire,"_Perimeter.shp")))
   fire_kfact <- terra::intersect(kfact, perim)
   fire_kfact$area_m2 <- expanse(fire_kfact, unit = "m")
   fire_kfact$weighted_value <- fire_kfact$area_m2 * fire_kfact$KFactor
@@ -35,9 +35,9 @@ for(fire in fires){
 }
 kfact_df
 
-caldor <- vect(here("Caldor","Caldor_Perimeter.shp"))
-dixie <- vect(here("Dixie","Dixie_Perimeter.shp"))
-knp <- vect(here("KNP","KNP_Perimeter.shp"))
+caldor <- vect(here("Fire_Data","Caldor","Caldor_Perimeter.shp"))
+dixie <- vect(here("Fire_Data","Dixie","Dixie_Perimeter.shp"))
+knp <- vect(here("Fire_Data","KNP","KNP_Perimeter.shp"))
 cal_fires <- vect(svc(caldor,dixie,knp))
 
 fires_kfact <- terra::intersect(kfact, cal_fires)
@@ -55,13 +55,13 @@ avg_rain <- round(mean(c(caldor_rain, dixie_rain, knp_rain)))
 fires <- c("Caldor","Dixie","KNP","CedarCreek","CubCreek2")
 basins_list <- list()
 for(i in 1:length(fires)){
-  bounds <- vect(here(fires[i],paste0(fires[i],"_Perimeter.shp")))
-  basins <- vect(here(fires[i],paste0(fires[i],"_basins_sensitivity_sbs.shp")))
+  bounds <- vect(here("Fire_Data",fires[i],paste0(fires[i],"_Perimeter.shp")))
+  basins <- vect(here("Fire_Data",fires[i],paste0(fires[i],"_basins_sensitivity_sbs.shp")))
   # centroid <- centroids(bounds)
   # centroid <- project(centroid, "EPSG:4326")
   # geom(centroid) # x and y used in NOAA Atlas 14 for 1-year 15min rainfall (multiply by 4)
   
-  dnbr <- rast(here(fires[i],paste0(fires[i],"_dNBR.tif")))
+  dnbr <- rast(here("Fire_Data",fires[i],paste0(fires[i],"_dNBR.tif")))
   names(dnbr) <- "dNBR"
   basins <- terra::extract(dnbr, basins, fun=mean, bind=T)
   basins_list[[i]] <- basins

@@ -12,10 +12,10 @@ library(here)
 fires <- c("CedarCreek","CubCreek2")
 for(fire in fires){
   cat(fire,"\n")
-  # polygons <- vect(here(fire,paste0(fire,"_sample_basins_sbs.shp")))
-  polygons <- vect(here(fire,paste0(fire,"_corrected_basins.shp")))
+  # polygons <- vect(here("Fire_Data",fire,paste0(fire,"_sample_basins_sbs.shp")))
+  polygons <- vect(here("Fire_Data",fire,paste0(fire,"_corrected_basins.shp")))
   # plot(polygons)
-  basins_corrected_dir <- here(fire,"Sample_Basins_corrected")
+  basins_corrected_dir <- here("Fire_Data",fire,"Sample_Basins_corrected")
   if(!dir.exists(basins_corrected_dir)) {
     dir.create(basins_corrected_dir)
   }
@@ -26,8 +26,8 @@ for(fire in fires){
     cat("   ",basin_name,"\n")
     
     # create an output directory if it doesn't exist
-    # output_dir <- here(fire,"Sample_Basins",basin_name)
-    output_dir <- here(fire,"Sample_Basins_corrected",basin_name)
+    # output_dir <- here("Fire_Data",fire,"Sample_Basins",basin_name)
+    output_dir <- here("Fire_Data",fire,"Sample_Basins_corrected",basin_name)
     if (!dir.exists(output_dir)) {
       dir.create(output_dir)
     }

@@ -11,7 +11,7 @@ post <- read_csv(here("QF_results","SBS","qf_results_site_corrected.csv")) %>%
 fires <- c("Caldor","CedarCreek","CubCreek2","Dixie","KNP")
 fires_list <- list()
 for(f in 1:length(fires)){
-  basins <- vect(here(fires[f],paste0(fires[f],"_sample_basins_sbs.shp")))
+  basins <- vect(here("Fire_Data",fires[f],paste0(fires[f],"_sample_basins_sbs.shp")))
   basins_df <- as_tibble(basins)
   basins_clean <- basins_df %>%
     mutate(id = row.names(basins_df)) %>%
@@ -19,7 +19,7 @@ for(f in 1:length(fires)){
     mutate(fire = fires[f]) %>%
     select(fire, site, severe_per, severe)
   if(fires[f] %in% c("CedarCreek","CubCreek2")){
-    basins_cor <- vect(here("CedarCreek","CedarCreek_corrected_basins.shp"))
+    basins_cor <- vect(here("Fire_Data","CedarCreek","CedarCreek_corrected_basins.shp"))
     basins_cor_df <- as_tibble(basins_cor)
     basins_cor_clean <- basins_cor_df %>%
       mutate(id = row.names(basins_cor_df)) %>%

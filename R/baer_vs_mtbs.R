@@ -7,8 +7,8 @@ if(fire != "CedarCreek"){
   baer <- rast(here("Fire_Severity","BAER",paste0(fire,"_dNBR_BAER.tif")))
 }
 # provisional <- rast(here("Fire_Severity","provisional",fire,paste0(fire,"_dNBR_provisional.tif")))
-mtbs <- rast(here(fire,paste0(fire,"_dNBR.tif")))
-perim <- vect(here(fire,paste0(fire,"_perimeter.shp")))
+mtbs <- rast(here("Fire_Data",fire,paste0(fire,"_dNBR.tif")))
+perim <- vect(here("Fire_Data",fire,paste0(fire,"_perimeter.shp")))
 
 baer_proj <- project(baer, mtbs)
 baer_mask <- mask(baer_proj, perim)
