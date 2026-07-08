@@ -94,10 +94,14 @@ set_defaults(map_service = "maptiler", map_type = "aquarelle", map_token = map_t
 inset <- ggplot() +
   basemap_gglayer(west_ext_vect) +
   scale_fill_identity() +
+  geom_spatvector(data = conus, fill = NA, color = "gray33") +
+  geom_spatvector(data = firestates, fill = NA, color = "black") +
   new_scale_fill() +
   geom_spatvector(data = fires, aes(fill = Incid_Name), color="black") +
-  scale_x_continuous(expand=c(0,0)) +
-  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(limits = c(west_ext[1], west_ext[2]),
+                     expand=c(0,0)) +
+  scale_y_continuous(limits = c(west_ext[3], west_ext[4]),
+                     expand=c(0,0)) +
   scale_fill_colorblind() +
   theme_bw() +
   theme(legend.position="none",
@@ -105,7 +109,7 @@ inset <- ggplot() +
         axis.ticks = element_blank(),
         axis.text = element_blank())
 inset
-ggsave("allfires2.png", inset, path = here("Plots","study_area_fig"), height = 10, width = 5)
+ggsave("allfires3.png", inset, path = here("Plots","study_area_fig"), height = 10, width = 5)
 
 # knp_sev <- read_severity(here("KNP","KNP_severity.tif"))
 # caldor_sev <- read_severity(here("Caldor","Caldor_severity.tif"))
